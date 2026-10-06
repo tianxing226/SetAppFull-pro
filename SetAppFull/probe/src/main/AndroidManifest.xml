@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:label="SetAppFull Probe" android:allowBackup="false" android:supportsRtl="true">
+        <activity android:name=".ViewProbeActivity" android:exported="true" android:resizeableActivity="true" android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".ComposeProbeActivity" android:exported="true" android:resizeableActivity="true" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".WebProbeActivity" android:exported="true" android:resizeableActivity="true" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".SurfaceProbeActivity" android:exported="true" android:resizeableActivity="true" />
+    </application>
+</manifest>

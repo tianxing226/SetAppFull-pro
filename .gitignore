@@ -1,0 +1,11 @@
+**/.gradle/
+**/.kotlin/
+**/build/
+**/local.properties
+**/*.jks
+**/*.p12
+**/*.pfx
+**/*.keystore
+**/release.properties
+.idea/
+*.iml
