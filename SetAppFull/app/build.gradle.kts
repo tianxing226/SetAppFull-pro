@@ -47,11 +47,11 @@ android {
     compileSdk = 37
     buildToolsVersion = "37.0.0"
     defaultConfig {
-        applicationId = "ss.colytitse.setappfull"
+        applicationId = "io.github.tianxing226.setappfullpro"
         minSdk = 30
         targetSdk = 37
-        versionCode = 201
-        versionName = "2.0.1"
+        versionCode = 202
+        versionName = "2.0.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {

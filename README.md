@@ -19,7 +19,7 @@
 
 ## 手机界面
 
-以下为正式版在 Android 17 **手机模拟器**中的实际截图；Probe 是随源码提供的测试应用。
+以下为 **2.0.1** 在 Android 17 **手机模拟器**中的实际截图，展示主页和规则设置界面，不代表新包名版本的测试结果；Probe 是随源码提供的测试应用。
 
 <table>
   <tr>
@@ -45,17 +45,17 @@
 
 标准 Android 的应用列表权限在安装时授予，不会额外弹窗；部分厂商系统需要单独授权。列表不完整时，可在设置页打开系统权限设置。
 
-维护版 2.0.0 可直接覆盖升级到 2.0.1。原版或其他作者签名的 APK 可能无法覆盖安装，请先保留自己的配置。
+**从 2.0.2 起使用独立包名 `io.github.tianxing226.setappfullpro`。** Android 会把它识别为新应用，可与原版或维护版 2.0.0 / 2.0.1 同时安装；旧版规则和框架作用域不会自动继承。请重新启用新模块、选择应用并设置规则，同时关闭旧模块对相同应用的作用域，避免两个模块同时控制窗口。
 
 ## 兼容与验证
 
-2.0.1 已在 Android 16 / API 101、Android 17 / API 102 手机模拟器和 MuMu 中完成相应回归验证。Android 16 / 17 平板的完整矩阵记录来自上一版 2.0.0；本版没有全部重跑。厂商 ROM、ARM 真机和实体挖孔屏仍需实际验证，小米授权弹窗也尚未经过真机测试。详情见 [验证说明](docs/VERIFICATION.md)。
+2.0.2 的新包名验证结果以 [验证说明](docs/VERIFICATION.md) 为准。历史版本 2.0.1 已在 Android 16 / API 101、Android 17 / API 102 手机模拟器和 MuMu 中完成相应回归验证；Android 16 / 17 平板的完整矩阵记录来自 2.0.0。这些历史记录不能替代新包名版本的验证。厂商 ROM、ARM 真机和实体挖孔屏仍需实际验证，小米授权弹窗也尚未经过真机测试。
 
 多窗口、画中画和浮动窗口会暂停全屏策略，输入法出现时会释放导航栏控制。Android 11 / 12 使用简化导航效果。
 
 ## 源码与致谢
 
-- [构建与维护说明](MODERNIZATION.md) · [2.0.1 更新说明](RELEASE-2.0.1.md)
+- [构建与维护说明](MODERNIZATION.md) · [2.0.2 更新说明](RELEASE-2.0.2.md)
 - 上游：[cokkeijigen/SetAppFull](https://github.com/cokkeijigen/SetAppFull)，保留原作者归属，采用 [AGPL-3.0](LICENSE) 许可证。
 - 液态玻璃：[Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) / Backdrop。
 - 其他依赖及许可见 [第三方声明](THIRD_PARTY_NOTICES.md)。

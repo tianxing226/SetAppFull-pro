@@ -22,12 +22,13 @@ import java.util.Set;
 import java.util.WeakHashMap;
 
 import io.github.libxposed.api.XposedModule;
+import ss.colytitse.setappfull.BuildConfig;
 import ss.colytitse.setappfull.core.RuleCodec;
 
 /** API 101 baseline; API 102 runs the same public API without opting into hot reload. */
 public final class FullscreenModule extends XposedModule {
     private static final String TAG = "SetAppFull";
-    private static final String MODULE_PACKAGE = "ss.colytitse.setappfull";
+    private static final String MODULE_PACKAGE = BuildConfig.APPLICATION_ID;
     private final Map<Window, WindowSession> windows = new WeakHashMap<>();
     private final Map<WindowInsetsController, WeakReference<WindowSession>> controllers = new WeakHashMap<>();
     private final Set<Method> observedMethods = new HashSet<>();

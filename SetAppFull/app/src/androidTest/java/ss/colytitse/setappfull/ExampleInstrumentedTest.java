@@ -1,6 +1,7 @@
 package ss.colytitse.setappfull;
 
 import android.content.Context;
+import android.content.Intent;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
@@ -18,6 +19,14 @@ public class ExampleInstrumentedTest {
     public void useAppContext() {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("ss.colytitse.setappfull", appContext.getPackageName());
+        assertEquals("io.github.tianxing226.setappfullpro", appContext.getPackageName());
+        assertEquals(BuildConfig.APPLICATION_ID, appContext.getPackageName());
+        // The independent APK ID must still resolve components in the retained source namespace.
+        Intent launch = appContext.getPackageManager().getLaunchIntentForPackage(appContext.getPackageName());
+        assertNotNull(launch);
+        assertNotNull(launch.getComponent());
+        assertEquals(appContext.getPackageName(), launch.getComponent().getPackageName());
+        assertEquals(MainActivity.class.getName(), launch.getComponent().getClassName());
+        assertTrue(appContext.getApplicationContext() instanceof SetAppFullApplication);
     }
 }
