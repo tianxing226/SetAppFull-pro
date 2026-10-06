@@ -1,5 +1,7 @@
 # SetAppFull pro 2.0 维护说明
 
+[简体中文](MODERNIZATION.md) | [English](MODERNIZATION_EN.md)
+
 此分支基于原仓库提交 `f58a262fd47f99ed90093dc97f3f8d2fea85e097` 改造，由本次维护者构建和签名，不是原作者发布。
 
 当前版本为 2.0.2 / 202，应用名称为 SetAppFull pro，独立 applicationId 为 `io.github.tianxing226.setappfullpro`。版本号不代表覆盖所有设备；实际验证范围以 [验证说明](docs/VERIFICATION.md) 和相应交付目录中的测试报告为准。本次增量更新见 [2.0.2 说明](RELEASE-2.0.2.md)。

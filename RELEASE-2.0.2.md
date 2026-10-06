@@ -1,5 +1,7 @@
 # SetAppFull pro 2.0.2
 
+[简体中文](RELEASE-2.0.2.md) | [English](RELEASE-2.0.2_EN.md)
+
 此版本为独立维护分支采用新包名，便于与原版区分并申请 LSPosed 模块仓库收录。版本代码为 **202**，应用名称继续使用 **SetAppFull pro**。
 
 ## 本次变化

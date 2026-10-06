@@ -1,5 +1,7 @@
 # SetAppFull pro
 
+[简体中文](README.md) | [English](README_EN.md)
+
 按应用设置**沉浸式全屏**的 Android 模块，让状态栏、导航栏和屏幕挖孔区域按你的需要显示。支持现代 LSPosed / libxposed API 101、102。
 
 **[下载正式版 APK](https://github.com/tianxing226/SetAppFull-pro/releases/latest)** · [Telegram 频道](https://t.me/tiaxcj) · [验证说明](docs/VERIFICATION.md)
@@ -49,7 +51,7 @@
 
 ## 兼容与验证
 
-2.0.2 的新包名验证结果以 [验证说明](docs/VERIFICATION.md) 为准。。
+2.0.2 的新包名验证结果以 [验证说明](docs/VERIFICATION.md) 为准。
 
 多窗口、画中画和浮动窗口会暂停全屏策略，输入法出现时会释放导航栏控制。Android 11 / 12 使用简化导航效果。
 
