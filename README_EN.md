@@ -49,6 +49,10 @@ On standard Android, app-list access is granted during installation and does not
 
 **Starting with 2.0.2, the app uses the standalone package name `io.github.tianxing226.setappfullpro`.**
 
+### Migrating from an older version
+
+Version 2.0.2 installs as a new app and can coexist with the original app or maintained versions 2.0.0 / 2.0.1; it does not replace them. Private configuration and framework scopes are not inherited automatically. After installing and enabling the new module, select target app scopes again and configure its fullscreen rules. Then disable the old module's scope for those same apps and restart each target app to check the result. You do not need to uninstall the old version first; keep it and its rules until the new setup is confirmed.
+
 ## Compatibility and verification
 
 See the [verification notes](docs/VERIFICATION_EN.md) for results using the new package name in 2.0.2.
@@ -57,7 +61,6 @@ Fullscreen policies are suspended in multi-window, picture-in-picture, and float
 
 ## Source and credits
 
-- [Build and maintenance notes](MODERNIZATION_EN.md) · [2.0.2 release notes](RELEASE-2.0.2_EN.md)
 - Upstream: [cokkeijigen/SetAppFull](https://github.com/cokkeijigen/SetAppFull). Original author attribution is retained under the [AGPL-3.0](LICENSE) license.
 - Liquid glass: [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) / Backdrop.
 - See the [third-party notices](THIRD_PARTY_NOTICES_EN.md) for other dependencies and licenses.

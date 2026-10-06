@@ -49,6 +49,10 @@
 
 **从 2.0.2 起使用独立包名 `io.github.tianxing226.setappfullpro`。** 
 
+### 从旧版迁移
+
+2.0.2 会作为新应用安装，可与原版或维护版 2.0.0 / 2.0.1 共存，不会覆盖旧版。旧应用的私有配置和框架作用域不会自动继承。安装并启用新模块后，请重新选择目标应用的作用域并设置全屏规则，再关闭旧模块对相同应用的作用域，最后重启目标应用检查效果。无需先卸载旧版；可在确认新版本配置完成前保留旧版及其规则。
+
 ## 兼容与验证
 
 2.0.2 的新包名验证结果以 [验证说明](docs/VERIFICATION.md) 为准。
@@ -57,7 +61,6 @@
 
 ## 源码与致谢
 
-- [构建与维护说明](MODERNIZATION.md) · [2.0.2 更新说明](RELEASE-2.0.2.md)
 - 上游：[cokkeijigen/SetAppFull](https://github.com/cokkeijigen/SetAppFull)，保留原作者归属，采用 [AGPL-3.0](LICENSE) 许可证。
 - 液态玻璃：[Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) / Backdrop。
 - 其他依赖及许可见 [第三方声明](THIRD_PARTY_NOTICES.md)。
