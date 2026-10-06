@@ -30,11 +30,13 @@ import androidx.compose.ui.unit.dp
 
 private fun Activity.prepareWindow() {
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    // PhoneWindow requires its decor to exist before getInsetsController().
+    val decor = window.decorView
     if (Build.VERSION.SDK_INT >= 30) {
         window.setDecorFitsSystemWindows(true)
         window.insetsController?.show(WindowInsets.Type.systemBars())
     }
-    window.decorView.viewTreeObserver.addOnGlobalLayoutListener {
+    decor.viewTreeObserver.addOnGlobalLayoutListener {
         val view = window.decorView
         val insets = view.rootWindowInsets
         if (Build.VERSION.SDK_INT >= 30 && insets != null) {
