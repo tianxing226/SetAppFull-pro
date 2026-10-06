@@ -1,4 +1,4 @@
-# SetAppFull/设置应用全屏
+# SetAppFull pro
 > 当前维护分支的实现、构建、安装和验证限制见 [2.0 维护说明](MODERNIZATION.md)。下方保留原项目历史说明，不代表新版已完成全部验收。
 
 Set app to full screen run _(:з」∠)_.<br>

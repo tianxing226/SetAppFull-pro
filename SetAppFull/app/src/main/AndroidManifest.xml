@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <!-- Installed packages are the central function of this local module manager. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+    <!-- Xiaomi's documented optional permission; request only when its system owner and runtime type match. -->
+    <uses-permission android:name="com.android.permission.GET_INSTALLED_APPS" />
     <application android:name=".SetAppFullApplication" android:allowBackup="false"
         android:label="@string/app_name" android:description="@string/xposeddescription" android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round" android:supportsRtl="true"

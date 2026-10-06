@@ -7,6 +7,7 @@ import android.content.pm.ApplicationInfo
 import android.util.Log
 import io.github.libxposed.service.XposedService
 import io.github.libxposed.service.XposedServiceHelper
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ss.colytitse.setappfull.ui.AppRow
+import ss.colytitse.setappfull.ui.AppListAccess
 import ss.colytitse.setappfull.ui.FrameworkStatus
 import ss.colytitse.setappfull.ui.UiState
 import ss.colytitse.setappfull.core.RuleCodec
@@ -31,6 +33,7 @@ class AppRepository(private val app: Application) {
     private var service: XposedService? = null
     private var remote: SharedPreferences? = null
     private var appCache: List<AppRow>? = null
+    private var appListNeedsRefresh = true
     private var migrated = false
     private val excluded = setOf(app.packageName, "android", "com.android.systemui")
 
@@ -88,13 +91,27 @@ class AppRepository(private val app: Application) {
     }
 
     fun refresh() = enqueue {
-        appCache = null
+        appListNeedsRefresh = true
         refreshLocked()
+    }
+
+    /** Keep permission guidance hidden until the query after a system dialog has completed. */
+    suspend fun refreshAndAwait() {
+        val completed = CompletableDeferred<Unit>()
+        enqueue {
+            try {
+                appListNeedsRefresh = true
+                refreshLocked()
+            } finally {
+                completed.complete(Unit)
+            }
+        }
+        completed.await()
     }
 
     private fun refreshLocked() {
         migrateLegacy()
-        if (appCache == null) appCache = loadApps()
+        if (appListNeedsRefresh) refreshAppListLocked()
         val current = service
         if (current == null) {
             rebuildRows(null)
@@ -199,18 +216,37 @@ class AppRepository(private val app: Application) {
     }
 
     @Suppress("DEPRECATION")
-    private fun loadApps(): List<AppRow> {
+    private fun refreshAppListLocked() {
+        appListNeedsRefresh = false
+        mutableState.value = mutableState.value.copy(
+            appListAccess = AppListAccess.CHECKING,
+            appListAccessMessage = "正在检查应用列表访问权限。",
+        )
         val pm = app.packageManager
-        return pm.getInstalledApplications(0).asSequence()
-            .filter { it.packageName !in excluded }
-            .map { info ->
-                AppRow(
-                    packageName = info.packageName,
-                    label = runCatching { info.loadLabel(pm).toString() }.getOrDefault(info.packageName),
-                    icon = runCatching { info.loadIcon(pm) }.getOrNull(),
-                    isSystem = info.flags and ApplicationInfo.FLAG_SYSTEM != 0,
-                )
-            }.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.label }).toList()
+        // QUERY_ALL_PACKAGES is a normal, install-time permission on Android. Calling
+        // requestPermissions() cannot produce a legitimate runtime grant dialog for it.
+        val result = queryAppListAccess(
+            hasPermission = app::hasAppListPermissions,
+            query = { pm.getInstalledApplications(0) },
+        )
+        result.apps?.let { infos ->
+            appCache = infos.asSequence()
+                .filter { it.packageName !in excluded }
+                .map { info ->
+                    AppRow(
+                        packageName = info.packageName,
+                        label = runCatching { info.loadLabel(pm).toString() }.getOrDefault(info.packageName),
+                        icon = runCatching { info.loadIcon(pm) }.getOrNull(),
+                        isSystem = info.flags and ApplicationInfo.FLAG_SYSTEM != 0,
+                    )
+                }.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.label }).toList()
+        }
+        // Keep both cached rows and stored rules when a vendor denies or fails a query.
+        // Framework synchronization below must continue independently of this result.
+        mutableState.value = mutableState.value.copy(
+            appListAccess = result.access,
+            appListAccessMessage = result.message,
+        )
     }
 
     private fun rebuildRows(scope: Set<String>?) {
@@ -234,7 +270,15 @@ class AppRepository(private val app: Application) {
         }
         mutableState.value = mutableState.value.copy(
             apps = all.filter { show || !it.isSystem },
-            enabledCount = all.count { it.flags and 1 != 0 },
+            enabledCount = if (mutableState.value.appListAccess == AppListAccess.READY) {
+                all.count { it.flags and 1 != 0 }
+            } else {
+                local.all.count { (key, value) ->
+                    val packageName = key.removePrefix(PREFIX)
+                    key.startsWith(PREFIX) && packageName !in excluded &&
+                        PACKAGE.matches(packageName) && value is Int && value and 1 != 0
+                }
+            },
             showSystem = show,
             loading = false,
         )

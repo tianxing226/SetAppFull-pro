@@ -67,8 +67,45 @@ class SetAppFullUiTest {
         onShowSystem: (Boolean) -> Unit = {},
         onReset: () -> Unit = {},
         onRefresh: () -> Unit = {},
+        onOpenAppSettings: () -> Unit = {},
+        permissionRequestInProgress: Boolean = false,
     ) {
-        SetAppFullApp(state.value, onRefresh, onToggle, onRuleChange, onScope, onShowSystem, onReset)
+        SetAppFullApp(state.value, onRefresh, onToggle, onRuleChange, onScope, onShowSystem, onReset,
+            onOpenAppSettings, permissionRequestInProgress)
+    }
+
+    @Test
+    fun deniedAppAccessPromptsOnceAndSettingsReturnCanRecover() {
+        var settingsRequests = 0
+        val state = mutableStateOf(UiState(appListAccess = AppListAccess.DENIED,
+            appListAccessMessage = "系统限制了应用列表访问。", loading = false))
+        compose.setContent { TestApp(state, onOpenAppSettings = { settingsRequests++ }) }
+        compose.onNodeWithTag("app_access_dialog").assertIsDisplayed()
+        compose.onNodeWithText("稍后处理").performClick()
+        compose.runOnIdle { state.value = state.value.copy(frameworkApi = 102) }
+        compose.onNodeWithTag("app_access_dialog").assertDoesNotExist()
+        compose.runOnIdle { state.value = state.value.copy(appListAccess = AppListAccess.CHECKING) }
+        compose.onNodeWithTag("app_access_dialog").assertDoesNotExist()
+        compose.runOnIdle { state.value = state.value.copy(appListAccess = AppListAccess.DENIED) }
+        compose.onNodeWithTag("app_access_dialog").assertDoesNotExist()
+        compose.onNodeWithTag("nav_1").performClick()
+        scrollTo("open_app_permissions").performClick()
+        compose.runOnIdle {
+            assertEquals(1, settingsRequests)
+            state.value = state.value.copy(appListAccess = AppListAccess.READY,
+                appListAccessMessage = "已读取可见应用。", apps = listOf(alpha))
+        }
+        compose.onNodeWithTag("app_access_dialog").assertDoesNotExist()
+        scrollTo("app_row_test.alpha").assertIsDisplayed()
+    }
+
+    @Test
+    fun realPermissionRequestDoesNotCompeteWithCustomGuidance() {
+        val state = mutableStateOf(UiState(appListAccess = AppListAccess.DENIED,
+            appListAccessMessage = "等待系统授权。", loading = false))
+        compose.setContent { TestApp(state, permissionRequestInProgress = true) }
+        compose.onNodeWithTag("app_access_purpose").assertIsDisplayed()
+        compose.onNodeWithTag("app_access_dialog").assertDoesNotExist()
     }
 
     @Test
@@ -256,9 +293,21 @@ class SetAppFullUiTest {
         }
         compose.onNodeWithTag("nav_0").assertIsDisplayed()
         compose.onNodeWithTag("nav_1").assertIsDisplayed().performClick()
-        scrollTo("filter_2").assertIsDisplayed().performClick()
+        fun unobscuredFilter(tag: String): SemanticsNodeInteraction {
+            val target = scrollTo(tag)
+            val navTop = compose.onNodeWithTag("nav_0").fetchSemanticsNode().boundsInRoot.top
+            val delta = target.fetchSemanticsNode().boundsInRoot.bottom - navTop + 24f
+            if (delta > 0f) compose.onNodeWithTag("settings_page")
+                .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, delta) }
+            return target.assertIsDisplayed()
+        }
+        unobscuredFilter("filter_2").performClick()
+        compose.onNodeWithTag("settings_page").assertExists()
         val root = compose.onNodeWithTag("app_root").fetchSemanticsNode().boundsInRoot
         listOf("nav_0", "nav_1", "filter_0", "filter_1", "filter_2").forEach { tag ->
+            // Wrapped filters can be clipped at opposite ends of a small viewport.
+            // Verify each remains reachable instead of requiring simultaneous visibility.
+            if (tag.startsWith("filter_")) unobscuredFilter(tag)
             val bounds = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
             assertTrue("$tag must fit horizontally", bounds.left >= root.left - 1f && bounds.right <= root.right + 1f)
         }

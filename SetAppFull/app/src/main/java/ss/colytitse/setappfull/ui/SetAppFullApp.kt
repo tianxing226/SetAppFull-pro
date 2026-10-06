@@ -34,6 +34,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -51,6 +53,7 @@ import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.highlight.Highlight
 import ss.colytitse.setappfull.BuildConfig
+import ss.colytitse.setappfull.R
 
 private val LightPalette = lightColorScheme(
     primary = Color(0xFF6554BE), onPrimary = Color.White,
@@ -80,6 +83,9 @@ fun SetAppFullApp(
     onScopeRequest: (String) -> Unit,
     onShowSystem: (Boolean) -> Unit,
     onReset: () -> Unit,
+    onOpenAppSettings: () -> Unit = {},
+    permissionRequestInProgress: Boolean = false,
+    onJoinCommunity: () -> Unit = {},
 ) {
     val dark = isSystemInDarkTheme()
     MaterialTheme(colorScheme = if (dark) DarkPalette else LightPalette) {
@@ -88,6 +94,12 @@ fun SetAppFullApp(
         var detailsPackage by rememberSaveable { mutableStateOf<String?>(null) }
         var pendingSystemPackage by rememberSaveable { mutableStateOf<String?>(null) }
         var resetDialog by rememberSaveable { mutableStateOf(false) }
+        var accessNoticeDismissed by rememberSaveable { mutableStateOf(false) }
+        val accessNeedsAttention = state.appListAccess == AppListAccess.DENIED || state.appListAccess == AppListAccess.ERROR
+        LaunchedEffect(state.appListAccess) {
+            // A refresh passes through CHECKING; it must not reopen dismissed guidance.
+            if (state.appListAccess == AppListAccess.READY) accessNoticeDismissed = false
+        }
         val guardedToggle: (String, Boolean) -> Unit = { packageName, enabled ->
             if (enabled && state.apps.firstOrNull { it.packageName == packageName }?.isSystem == true) {
                 pendingSystemPackage = packageName
@@ -107,11 +119,17 @@ fun SetAppFullApp(
                 ) {
                     Column(Modifier.widthIn(max = 900.dp).fillMaxSize()) {
                         Header(onRefresh)
+                        if (permissionRequestInProgress) {
+                            Text("需要读取已安装应用，才能选择要设置全屏的应用；请在系统权限窗口中选择。",
+                                Modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag("app_access_purpose"),
+                                style = MaterialTheme.typography.bodyMedium)
+                        }
                         if (page == 0) {
-                            HomePage(state, { page = 1 }, navigationHeight)
+                            HomePage(state, { page = 1 }, onJoinCommunity, navigationHeight)
                         } else {
                             SettingsPage(state, guardedToggle, onShowSystem,
-                                { detailsPackage = it }, { resetDialog = true }, navigationHeight)
+                                { detailsPackage = it }, { resetDialog = true }, navigationHeight,
+                                onOpenAppSettings, onRefresh)
                         }
                     }
                 }
@@ -120,6 +138,23 @@ fun SetAppFullApp(
                 Modifier.align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
                     .padding(horizontal = 28.dp, vertical = 16.dp))
+        }
+        if (accessNeedsAttention && !accessNoticeDismissed && !permissionRequestInProgress) {
+            AlertDialog(
+                onDismissRequest = { accessNoticeDismissed = true },
+                modifier = Modifier.testTag("app_access_dialog"),
+                title = { Text("需要检查应用列表访问") },
+                text = { Text(state.appListAccessMessage) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        accessNoticeDismissed = true
+                        onOpenAppSettings()
+                    }) { Text("打开权限设置") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { accessNoticeDismissed = true }) { Text("稍后处理") }
+                },
+            )
         }
         val detailedApp = state.apps.firstOrNull { it.packageName == detailsPackage }
         if (detailedApp != null) {
@@ -177,9 +212,9 @@ private fun AmbientBackground(dark: Boolean) {
 private fun Header(onRefresh: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(start = 26.dp, end = 16.dp, top = 14.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Icon(AppIcons.Expand, null, Modifier.size(23.dp), tint = MaterialTheme.colorScheme.primary)
+        Image(painterResource(R.drawable.ic_pro_mark), null, Modifier.size(30.dp))
         Spacer(Modifier.width(10.dp))
-        Text("SetAppFull", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f).testTag("app_title"))
         IconButton(onClick = onRefresh, modifier = Modifier.testTag("refresh")) {
             Icon(AppIcons.Refresh, "刷新框架状态和应用列表", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -188,7 +223,8 @@ private fun Header(onRefresh: () -> Unit) {
 }
 
 @Composable
-private fun HomePage(state: UiState, onSettings: () -> Unit, navigationHeight: androidx.compose.ui.unit.Dp) {
+private fun HomePage(state: UiState, onSettings: () -> Unit, onJoinCommunity: () -> Unit,
+    navigationHeight: androidx.compose.ui.unit.Dp) {
     val connected = state.status == FrameworkStatus.CONNECTED
     val statusText = when (state.status) {
         FrameworkStatus.CHECKING -> "正在检测"
@@ -262,6 +298,21 @@ private fun HomePage(state: UiState, onSettings: () -> Unit, navigationHeight: a
         }
         if (state.error != null) item { MessageCard(state.error, true) }
         item {
+            OutlinedButton(onClick = onJoinCommunity,
+                modifier = Modifier.fillMaxWidth().testTag("join_community"),
+                shape = RoundedCornerShape(24.dp),
+                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 18.dp)) {
+                Icon(AppIcons.Link, null)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("加入群聊", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold)
+                    Text("Telegram · @tiaxcj", style = MaterialTheme.typography.bodySmall)
+                }
+                Icon(AppIcons.Arrow, null)
+            }
+        }
+        item {
             Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)) {
                 Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     InfoLine("模块版本", BuildConfig.VERSION_NAME, "module_version")
@@ -296,6 +347,7 @@ private fun InfoLine(label: String, value: String, tag: String? = null) {
 private fun SettingsPage(
     state: UiState, onToggle: (String, Boolean) -> Unit, onShowSystem: (Boolean) -> Unit,
     onDetails: (String) -> Unit, onReset: () -> Unit, navigationHeight: androidx.compose.ui.unit.Dp,
+    onOpenAppSettings: () -> Unit, onRefresh: () -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableIntStateOf(0) }
@@ -315,6 +367,9 @@ private fun SettingsPage(
                 fontWeight = FontWeight.Bold)
             Text("每个应用，都有自己的全屏方式。", style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (state.appListAccess == AppListAccess.DENIED || state.appListAccess == AppListAccess.ERROR) item {
+            AppListAccessCard(state, onOpenAppSettings, onRefresh)
         }
         item {
             OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(top = 10.dp).testTag("app_search"),
@@ -350,7 +405,7 @@ private fun SettingsPage(
                 Text("正在加载应用…", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        if (!state.loading && apps.isEmpty()) item {
+        if (!state.loading && apps.isEmpty() && state.appListAccess != AppListAccess.DENIED && state.appListAccess != AppListAccess.ERROR) item {
             Column(Modifier.fillMaxWidth().padding(vertical = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(AppIcons.Search, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(12.dp))
@@ -363,6 +418,9 @@ private fun SettingsPage(
         items(apps, key = { it.packageName }) { app ->
             ApplicationCard(app, { onToggle(app.packageName, it) }, { onDetails(app.packageName) })
         }
+        if (state.appListAccess != AppListAccess.DENIED && state.appListAccess != AppListAccess.ERROR) item {
+            AppListAccessCard(state, onOpenAppSettings, onRefresh)
+        }
         item {
             Column(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("${apps.size} 个应用 · 点击应用可调整显示细则", style = MaterialTheme.typography.bodySmall,
@@ -370,6 +428,32 @@ private fun SettingsPage(
                 TextButton(onClick = onReset, modifier = Modifier.padding(top = 10.dp).testTag("reset_rules")) {
                     Text("重置所有应用规则")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppListAccessCard(state: UiState, onOpenAppSettings: () -> Unit, onRefresh: () -> Unit) {
+    val ready = state.appListAccess == AppListAccess.READY
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp).testTag("app_list_access"),
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(when (state.appListAccess) {
+                AppListAccess.CHECKING -> "正在检查应用列表访问"
+                AppListAccess.READY -> "应用列表可读取"
+                AppListAccess.DENIED -> "应用列表访问受限"
+                AppListAccess.ERROR -> "应用列表读取未完成"
+            }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(state.appListAccessMessage.ifBlank { "启动时自动检查读取应用列表所需的访问权限。" },
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (state.appListAccess != AppListAccess.CHECKING) {
+                TextButton(onClick = onOpenAppSettings, modifier = Modifier.testTag("open_app_permissions")) {
+                    Text(if (ready) "列表不完整？检查系统权限" else "打开权限设置")
+                }
+            }
+            if (state.appListAccess == AppListAccess.DENIED || state.appListAccess == AppListAccess.ERROR) {
+                TextButton(onClick = onRefresh, modifier = Modifier.testTag("retry_app_access")) { Text("重新检查") }
             }
         }
     }

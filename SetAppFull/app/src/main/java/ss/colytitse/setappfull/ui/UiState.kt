@@ -5,12 +5,17 @@ import android.graphics.drawable.Drawable
 /** The service connection and each target's scope are intentionally separate states. */
 enum class FrameworkStatus { CHECKING, CONNECTED, UNAVAILABLE, DISCONNECTED, UNSUPPORTED }
 
+/** READY means the system query succeeded; vendors can still filter its results. */
+enum class AppListAccess { CHECKING, READY, DENIED, ERROR }
+
 data class UiState(
     val frameworkName: String = "",
     val frameworkVersion: String = "",
     val frameworkApi: Int? = null,
     val status: FrameworkStatus = FrameworkStatus.CHECKING,
     val statusMessage: String = "",
+    val appListAccess: AppListAccess = AppListAccess.CHECKING,
+    val appListAccessMessage: String = "",
     val enabledCount: Int = 0,
     val apps: List<AppRow> = emptyList(),
     val showSystem: Boolean = false,

@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">设置应用全屏</string>
+    <string name="app_name">SetAppFull pro</string>
     <string name="xposeddescription">通过现代 libxposed 为每个应用独立管理全屏、系统栏和显示缺口区域。</string>
 </resources>
