@@ -32,6 +32,16 @@ try {
         $native += [pscustomobject]@{path=$entry.FullName;size=$entry.Length;elf64=$is64;loadSegmentAlignments=$alignment;supports16KiBAlignment=($alignment.Count -gt 0 -and @($alignment | Where-Object {$_ -lt 16384}).Count -eq 0)}
     }
     $entryPoints=@($archive.Entries | Where-Object FullName -match '^META-INF/xposed/' | ForEach-Object FullName)
+    $sourceBuildInfo = [ordered]@{}
+    $buildInfoEntry = $archive.GetEntry('assets/build-info.properties')
+    if ($null -ne $buildInfoEntry) {
+        $reader = [IO.StreamReader]::new($buildInfoEntry.Open())
+        try {
+            foreach ($line in ($reader.ReadToEnd() -split "`n")) {
+                if ($line -match '^([^=]+)=(.*)$') { $sourceBuildInfo[$Matches[1]] = $Matches[2].Trim() }
+            }
+        } finally { $reader.Dispose() }
+    }
 } finally { $archive.Dispose() }
 $baseName=[IO.Path]::GetFileNameWithoutExtension($apkPath)
 $alignmentOutput=& "$env:ANDROID_HOME\build-tools\37.0.0\zipalign.exe" -c -P 16 -v 4 $apkPath
@@ -40,7 +50,7 @@ $alignmentOutput | Set-Content -LiteralPath "$env:SETAPPFULL_ROOT\reports\$baseN
 $signatureOutput=& "$env:ANDROID_HOME\build-tools\37.0.0\apksigner.bat" verify --verbose --print-certs $apkPath 2>&1
 $signatureExit=$LASTEXITCODE
 $signatureOutput | Set-Content -LiteralPath "$env:SETAPPFULL_ROOT\reports\$baseName-signature.txt"
-$report=[ordered]@{apk=$apkPath;sha256=(Get-FileHash -LiteralPath $apkPath -Algorithm SHA256).Hash;zipalignPassed=($alignmentExit -eq 0);signatureVerified=($signatureExit -eq 0);moduleMetadata=$entryPoints;nativeLibraries=$native}
+$report=[ordered]@{apk=$apkPath;sha256=(Get-FileHash -LiteralPath $apkPath -Algorithm SHA256).Hash;zipalignPassed=($alignmentExit -eq 0);signatureVerified=($signatureExit -eq 0);sourceBuildInfo=$sourceBuildInfo;moduleMetadata=$entryPoints;nativeLibraries=$native}
 $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath "$env:SETAPPFULL_ROOT\reports\$baseName-package-audit.json" -Encoding utf8
 $report | ConvertTo-Json -Depth 8
 if ($alignmentExit -ne 0 -or $signatureExit -ne 0 -or @($native | Where-Object {$_.elf64 -and -not $_.supports16KiBAlignment}).Count -gt 0) { throw 'APK signature, ZIP alignment, or 64-bit native ELF alignment validation failed.' }
