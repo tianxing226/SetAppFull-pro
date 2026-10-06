@@ -76,7 +76,7 @@ fun SetAppFullApp(
     state: UiState,
     onRefresh: () -> Unit,
     onToggle: (String, Boolean) -> Unit,
-    onRuleChange: (String, Int) -> Unit,
+    onRuleChange: (String, Int, Boolean) -> Unit,
     onScopeRequest: (String) -> Unit,
     onShowSystem: (Boolean) -> Unit,
     onReset: () -> Unit,
@@ -414,7 +414,7 @@ private fun AppIcon(app: AppRow) {
 
 @Composable
 private fun RulesDialog(
-    app: AppRow, onToggle: (String, Boolean) -> Unit, onRuleChange: (String, Int) -> Unit,
+    app: AppRow, onToggle: (String, Boolean) -> Unit, onRuleChange: (String, Int, Boolean) -> Unit,
     onScopeRequest: (String) -> Unit, onDismiss: () -> Unit,
 ) {
     AlertDialog(onDismissRequest = onDismiss, modifier = Modifier.testTag("rules_dialog"),
@@ -425,13 +425,13 @@ private fun RulesDialog(
                 RuleRow("开启全屏规则", "此应用独立生效", app.enabled) { onToggle(app.packageName, it) }
                 HorizontalDivider()
                 RuleRow("隐藏状态栏", "扩大顶部可用空间", app.flags and 2 != 0, app.enabled) {
-                    onRuleChange(app.packageName, if (it) app.flags or 2 else app.flags and 2.inv())
+                    onRuleChange(app.packageName, 2, it)
                 }
                 RuleRow("隐藏导航栏", "可通过边缘手势临时呼出", app.flags and 4 != 0, app.enabled) {
-                    onRuleChange(app.packageName, if (it) app.flags or 4 else app.flags and 4.inv())
+                    onRuleChange(app.packageName, 4, it)
                 }
                 RuleRow("延伸至挖孔区域", "允许内容绘制到屏幕缺口附近", app.flags and 8 != 0, app.enabled) {
-                    onRuleChange(app.packageName, if (it) app.flags or 8 else app.flags and 8.inv())
+                    onRuleChange(app.packageName, 8, it)
                 }
                 HorizontalDivider()
                 Text(when (app.inScope) {

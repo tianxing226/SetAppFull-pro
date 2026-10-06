@@ -150,7 +150,12 @@ class AppRepository(private val app: Application) {
         writeRule(packageName, RuleCodec.withEnabled(previous, enabled))
     }
 
-    fun setRule(packageName: String, flags: Int) = enqueue { writeRule(packageName, flags) }
+    fun setOption(packageName: String, option: Int, enabled: Boolean) = enqueue {
+        require(option == 2 || option == 4 || option == 8)
+        // Read inside the queue: different switches may be tapped before UI state catches up.
+        val previous = local.getInt(PREFIX + packageName, 0)
+        writeRule(packageName, if (enabled) previous or option else previous and option.inv())
+    }
 
     private fun writeRule(packageName: String, flags: Int) {
         require(packageName !in excluded && PACKAGE.matches(packageName))

@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
                 state = state,
                 onRefresh = repository::refresh,
                 onToggle = repository::toggle,
-                onRuleChange = repository::setRule,
+                onRuleChange = repository::setOption,
                 onScopeRequest = repository::requestScope,
                 onShowSystem = repository::showSystem,
                 onReset = repository::reset,

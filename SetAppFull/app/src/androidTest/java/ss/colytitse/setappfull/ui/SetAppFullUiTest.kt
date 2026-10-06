@@ -62,7 +62,7 @@ class SetAppFullUiTest {
     private fun TestApp(
         state: MutableState<UiState>,
         onToggle: (String, Boolean) -> Unit = { _, _ -> },
-        onRuleChange: (String, Int) -> Unit = { _, _ -> },
+        onRuleChange: (String, Int, Boolean) -> Unit = { _, _, _ -> },
         onScope: (String) -> Unit = {},
         onShowSystem: (Boolean) -> Unit = {},
         onReset: () -> Unit = {},
@@ -181,21 +181,23 @@ class SetAppFullUiTest {
     }
 
     @Test
-    fun changingOneDisplayRulePreservesOtherRules() {
+    fun changingRulesEmitsIndependentOperationsBeforeRepositoryAcknowledgement() {
         val state = mutableStateOf(UiState(apps = listOf(beta), loading = false))
-        val changes = mutableListOf<Pair<String, Int>>()
+        val changes = mutableListOf<Triple<String, Int, Boolean>>()
         compose.setContent {
-            TestApp(state, onRuleChange = { packageName, flags ->
-                changes += packageName to flags
-                state.value = state.value.copy(apps = listOf(beta.copy(flags = flags)))
+            TestApp(state, onRuleChange = { packageName, optionBit, enabled ->
+                // Deliberately keep the original UiState until both actions have arrived.
+                changes += Triple(packageName, optionBit, enabled)
             })
         }
         compose.onNodeWithTag("nav_1").performClick()
         scrollTo("app_row_test.beta").performClick()
-        compose.onNodeWithContentDescription("隐藏状态栏").performScrollTo().assertIsOn().performClick().assertIsOff()
-        compose.onNodeWithContentDescription("隐藏导航栏").assertIsOn()
+        compose.onNodeWithContentDescription("隐藏状态栏").performScrollTo().assertIsOn().performClick()
+        compose.onNodeWithContentDescription("隐藏导航栏").assertIsOn().performClick()
         compose.onNodeWithContentDescription("延伸至挖孔区域").assertIsOn()
-        compose.runOnIdle { assertEquals(listOf("test.beta" to 13), changes) }
+        compose.runOnIdle {
+            assertEquals(listOf(Triple("test.beta", 2, false), Triple("test.beta", 4, false)), changes)
+        }
     }
 
     @Test
