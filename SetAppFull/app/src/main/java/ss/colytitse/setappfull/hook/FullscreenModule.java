@@ -12,6 +12,7 @@ import android.util.Log;
 import android.view.Window;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.view.View;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
@@ -92,10 +93,20 @@ public final class FullscreenModule extends XposedModule {
                 if (session != null) {
                     WindowManager.LayoutParams params = (WindowManager.LayoutParams) chain.getArg(0);
                     session.observeCutoutRequest(params.layoutInDisplayCutoutMode);
+                    session.observeAttributesFullscreenRequest(
+                            (params.flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0);
                     session.observeAttributesSecureRequest(
                             (params.flags & WindowManager.LayoutParams.FLAG_SECURE) != 0);
                     session.scheduleApply();
                 }
+            }
+            return result;
+        });
+        installHook(Window.class, "setDecorFitsSystemWindows", new Class<?>[]{boolean.class}, chain -> {
+            Object result = chain.proceed();
+            if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
+                WindowSession session = sessionFor((Window) chain.getThisObject());
+                if (session != null) session.scheduleApply();
             }
             return result;
         });
@@ -129,6 +140,26 @@ public final class FullscreenModule extends XposedModule {
                     session.observeSecureRequest(false);
                     session.scheduleApply();
                 }
+            }
+            return result;
+        });
+        installHook(View.class, "setSystemUiVisibility", new Class<?>[]{int.class}, chain -> {
+            Object result = chain.proceed();
+            if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
+                // Targets often reset decor visibility after resume or after a WebView relayout.
+                // Reapply every tracked window in this process so the configured bar policy wins
+                // without suppressing the target's original call.
+                onMain(() -> {
+                    for (WindowSession session : new ArrayList<>(windows.values())) session.apply(true);
+                });
+            }
+            return result;
+        });
+        installHook(Activity.class, "onWindowFocusChanged", new Class<?>[]{boolean.class}, chain -> {
+            Object result = chain.proceed();
+            if (!moduleMutation.get() && Boolean.TRUE.equals(chain.getArg(0))) {
+                Activity activity = (Activity) chain.getThisObject();
+                onMain(() -> resume(activity));
             }
             return result;
         });
@@ -245,6 +276,9 @@ public final class FullscreenModule extends XposedModule {
                     if (session != null) {
                         if (name.equals("setSystemBarsBehavior")) session.observeBehaviorRequest((Integer) chain.getArg(0));
                         else session.observeBarRequest((Integer) chain.getArg(0), name.equals("show"));
+                        // The target may immediately show a bar after our hide call. Queue a
+                        // correction even when the configured rule itself has not changed.
+                        session.scheduleApply();
                     }
                 }
                 // Observation only: do not suppress system gestures or an app's IME requests.

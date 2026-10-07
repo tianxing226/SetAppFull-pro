@@ -34,6 +34,11 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
     private boolean secureBaselineCaptured;
     private boolean originalSecure;
     private boolean screenshotControlled;
+    private boolean originalFullscreenFlag;
+    private boolean requestedFullscreenFlag;
+    private boolean fullscreenFlagControlled;
+    private boolean systemUiBaselineCaptured;
+    private int controlledLegacySystemUi;
     private boolean reliefBaselineCaptured;
     private int originalStatusBarColor;
     private int originalNavigationBarColor;
@@ -130,12 +135,20 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
 
     void observeFlagsRequest(int flags, int mask) {
         if ((mask & WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0) {
+            requestedFullscreenFlag = (flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0;
             observeBarRequest(WindowInsets.Type.statusBars(),
                     (flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) == 0);
         }
         if ((mask & WindowManager.LayoutParams.FLAG_SECURE) != 0) {
             observeSecureRequest((flags & WindowManager.LayoutParams.FLAG_SECURE) != 0);
         }
+    }
+
+    void observeAttributesFullscreenRequest(boolean fullscreen) {
+        // LayoutParams frequently mirrors the FLAG_FULLSCREEN value that this module just
+        // applied. Do not let that mirror make the disabled state fullscreen forever; explicit
+        // setFlags/addFlags/clearFlags calls remain authoritative through observeFlagsRequest.
+        if (!fullscreenFlagControlled) requestedFullscreenFlag = fullscreen;
     }
 
     void observeSecureRequest(boolean secure) {
@@ -181,6 +194,13 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
                 originalSecure = (window.getAttributes().flags & WindowManager.LayoutParams.FLAG_SECURE) != 0;
                 secureBaselineCaptured = true;
             }
+            if (!systemUiBaselineCaptured) {
+                originalSystemUiVisibility = decor.getSystemUiVisibility();
+                originalFullscreenFlag = (window.getAttributes().flags
+                        & WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0;
+                requestedFullscreenFlag = originalFullscreenFlag;
+                systemUiBaselineCaptured = true;
+            }
             int effective = WindowPolicy.effectiveRule(module.ruleFor(packageName),
                     activity != null && activity.isInMultiWindowMode(),
                     activity != null && activity.isInPictureInPictureMode(), floating,
@@ -218,6 +238,11 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
         }
         controlledBarTypes = hideTypes;
 
+        // Keep the legacy path in sync with WindowInsetsController. A number of real-world
+        // applications (and some Android 15/16 compatibility layers) reapply decor visibility
+        // after the modern controller call, which otherwise makes the status bar visible again.
+        applyLegacySystemUi(window, effective);
+
         boolean allowScreenshot = (effective & RuleCodec.ALLOW_SCREENSHOT) != 0;
         int currentFlags = window.getAttributes().flags;
         boolean secure = (currentFlags & WindowManager.LayoutParams.FLAG_SECURE) != 0;
@@ -244,11 +269,41 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
         }
         cutoutControlled = allowCutout;
 
-        applyReliefCompatibility(window);
+        applyReliefCompatibility(window, effective);
+        // The Relief compatibility path updates legacy decor flags after the modern controller;
+        // issue one final hide so Android's insets state and the legacy state converge.
+        if (hideTypes != 0) controller.hide(hideTypes);
+    }
+
+    private void applyLegacySystemUi(Window window, int effective) {
+        View decor = window.getDecorView();
+        int desiredControlled = 0;
+        if ((effective & RuleCodec.HIDE_STATUS) != 0) {
+            desiredControlled |= View.SYSTEM_UI_FLAG_FULLSCREEN;
+            if ((window.getAttributes().flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) == 0) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            }
+            fullscreenFlagControlled = true;
+        } else if (fullscreenFlagControlled) {
+            if (requestedFullscreenFlag) window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            fullscreenFlagControlled = false;
+        }
+        if ((effective & RuleCodec.HIDE_NAVIGATION) != 0) {
+            desiredControlled |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+        }
+
+        int current = decor.getSystemUiVisibility();
+        int released = controlledLegacySystemUi & ~desiredControlled;
+        if (released != 0) current = (current & ~released) | (originalSystemUiVisibility & released);
+        int updated = current | desiredControlled;
+        if (updated != current) decor.setSystemUiVisibility(updated);
+        controlledLegacySystemUi = desiredControlled;
     }
 
     /** Relief Map is a legacy WebView wrapper whose loaded page is inset by the visible status bar. */
-    private void applyReliefCompatibility(Window window) {
+    private void applyReliefCompatibility(Window window, int effective) {
         int configured = module.ruleFor(packageName);
         boolean enabled = RuleCodec.isEnabled(configured)
                 && (configured & (RuleCodec.HIDE_STATUS | RuleCodec.HIDE_NAVIGATION | RuleCodec.ALLOW_CUTOUT)) != 0
@@ -262,15 +317,22 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
             reliefBaselineCaptured = true;
         }
         View decor = window.getDecorView();
-        if (enabled && !reliefEdgeToEdge) {
-            window.setStatusBarColor(Color.TRANSPARENT);
-            window.setNavigationBarColor(Color.TRANSPARENT);
-            if (android.os.Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false);
-            decor.setSystemUiVisibility(originalSystemUiVisibility
+        if (enabled) {
+            if (!reliefEdgeToEdge) {
+                window.setStatusBarColor(Color.TRANSPARENT);
+                window.setNavigationBarColor(Color.TRANSPARENT);
+                if (android.os.Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false);
+                reliefEdgeToEdge = true;
+            }
+            int desired = originalSystemUiVisibility
                     | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-            reliefEdgeToEdge = true;
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            if ((effective & RuleCodec.HIDE_STATUS) != 0) desired |= View.SYSTEM_UI_FLAG_FULLSCREEN;
+            if ((effective & RuleCodec.HIDE_NAVIGATION) != 0) {
+                desired |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+            }
+            if (decor.getSystemUiVisibility() != desired) decor.setSystemUiVisibility(desired);
         } else if (!enabled && reliefEdgeToEdge) {
             window.setStatusBarColor(originalStatusBarColor);
             window.setNavigationBarColor(originalNavigationBarColor);
