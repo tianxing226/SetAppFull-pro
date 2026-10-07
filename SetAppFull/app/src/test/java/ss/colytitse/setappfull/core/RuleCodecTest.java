@@ -32,7 +32,7 @@ public class RuleCodecTest {
                 "SystemMode", "#com.cutout##com.duplicate#",
                 "scope_mode_switch", true), Map.of());
         assertEquals(Map.of("rule.com.first", 15, "rule.com.second", 15,
-                "rule.com.duplicate", 15, "rule.com.cutout", 9), migrated);
+                "rule.com.duplicate", 15, "rule.com.cutout", 15), migrated);
     }
 
     @Test public void migrationNeverOverwritesAnExplicitNewDecision() {

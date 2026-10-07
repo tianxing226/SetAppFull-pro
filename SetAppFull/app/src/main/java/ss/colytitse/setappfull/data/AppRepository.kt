@@ -151,6 +151,7 @@ class AppRepository(private val app: Application) {
     /** Dirty keys win over remote data, including offline disable/reset operations. */
     private fun synchronizeRules() {
         val prefs = remote ?: return
+        migrateLegacySystemModeRules(prefs)
         val plan = RuleSyncPlan.create(local.all, prefs.all, local.getBoolean("reset_pending", false))
         val edit = prefs.edit()
         plan.remoteWrites.forEach { (key, value) -> edit.putInt(key, value) }
@@ -298,11 +299,54 @@ class AppRepository(private val app: Application) {
             }
             check(edit.putBoolean("migration_complete", true).commit())
         }
+        migrateLegacySystemModeRules(null)
         migrated = true
+    }
+
+    /**
+     * The old SystemMode meant the complete immersive mode, but its first new-format migration
+     * wrote only ENABLED+CUTOUT (9). That made the app edge-to-edge while leaving status icons
+     * visible on devices whose system bar behavior differs from the emulator. Upgrade only those
+     * packages that can be traced to the historical SystemMode list, once per package.
+     */
+    private fun migrateLegacySystemModeRules(remotePrefs: SharedPreferences?) {
+        val names = (app.getSharedPreferences("config", Context.MODE_PRIVATE)
+            .getString("SystemMode", "") ?: "")
+            .split('#')
+            .map(String::trim)
+            .filter { RuleCodec.validPackage(it) && it !in excluded }
+            .toSet()
+        if (names.isEmpty()) return
+
+        val localEdit = local.edit()
+        val remoteEdit = remotePrefs?.edit()
+        var localChanged = false
+        var remoteChanged = false
+        names.forEach { packageName ->
+            val marker = LEGACY_SYSTEM_MODE_MARKER + packageName
+            if (local.getBoolean(marker, false)) return@forEach
+            val key = PREFIX + packageName
+            val localValue = local.getInt(key, Int.MIN_VALUE)
+            val remoteValue = remotePrefs?.getInt(key, Int.MIN_VALUE) ?: Int.MIN_VALUE
+            val legacyValue = RuleCodec.ENABLED or RuleCodec.ALLOW_CUTOUT
+            if (localValue == legacyValue || remoteValue == legacyValue) {
+                localEdit.putInt(key, RuleCodec.DEFAULT_ENABLED)
+                    .putBoolean("dirty.$key", true)
+                localChanged = true
+                if (remoteEdit != null && remoteValue == legacyValue) {
+                    remoteEdit.putInt(key, RuleCodec.DEFAULT_ENABLED)
+                    remoteChanged = true
+                }
+                localEdit.putBoolean(marker, true)
+            }
+        }
+        if (remoteChanged) check(remoteEdit!!.commit()) { "Legacy remote migration failed" }
+        if (localChanged) check(localEdit.commit()) { "Legacy local migration failed" }
     }
 
     companion object {
         private const val PREFIX = "rule."
+        private const val LEGACY_SYSTEM_MODE_MARKER = "legacy.systemMode.fullscreen."
         private val PACKAGE = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+")
     }
 }

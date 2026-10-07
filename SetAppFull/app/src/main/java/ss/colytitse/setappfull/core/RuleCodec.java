@@ -71,7 +71,7 @@ public final class RuleCodec {
     public static Map<String, Integer> migrateLegacy(Map<String, ?> legacy, Map<String, ?> existing) {
         Map<String, Integer> additions = new LinkedHashMap<>();
         for (String name : packages(legacy.get("SystemMode"))) {
-            putIfMissing(additions, existing, name, ENABLED | ALLOW_CUTOUT);
+            putIfMissing(additions, existing, name, DEFAULT_ENABLED);
         }
         Set<String> appMode = packages(legacy.get("AppMode"));
         appMode.addAll(packages(legacy.get("TimelyMode")));

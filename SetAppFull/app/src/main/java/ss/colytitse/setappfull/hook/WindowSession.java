@@ -116,6 +116,20 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
         }
     }
 
+    boolean ownsView(View view) {
+        Window window = windowReference.get();
+        if (window == null || view == null) return false;
+        View decor = window.peekDecorView();
+        if (decor == null) return false;
+        return view == decor || view.getRootView() == decor;
+    }
+
+    int enforceSystemUiVisibility(int requested) {
+        // Intercept the target's own decor reset so the hide takes effect in the same call. The
+        // follow-up scheduled apply also restores Relief Map's layout flags and controller state.
+        return controlledLegacySystemUi == 0 ? requested : requested | controlledLegacySystemUi;
+    }
+
     void observeCutoutRequest(int requested) {
         // A caller may mutate getAttributes() in place, retaining our own cutout value.
         if (!cutoutControlled || requested != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS) {
@@ -205,7 +219,7 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
                     activity != null && activity.isInMultiWindowMode(),
                     activity != null && activity.isInPictureInPictureMode(), floating,
                     insets.isVisible(WindowInsets.Type.ime()));
-            if (!force && effective == lastEffectiveRule) return;
+            if (!force && effective == lastEffectiveRule && !barsNeedCorrection(window, decor, insets, effective)) return;
             int previous = lastEffectiveRule;
             module.mutate(() -> applyPolicy(window, controller, effective));
             lastEffectiveRule = effective;
@@ -273,6 +287,22 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
         // The Relief compatibility path updates legacy decor flags after the modern controller;
         // issue one final hide so Android's insets state and the legacy state converge.
         if (hideTypes != 0) controller.hide(hideTypes);
+    }
+
+    private boolean barsNeedCorrection(Window window, View decor, WindowInsets insets, int effective) {
+        int hideTypes = 0;
+        if ((effective & RuleCodec.HIDE_STATUS) != 0) hideTypes |= WindowInsets.Type.statusBars();
+        if ((effective & RuleCodec.HIDE_NAVIGATION) != 0) hideTypes |= WindowInsets.Type.navigationBars();
+        if (hideTypes == 0) return false;
+        if ((hideTypes & WindowInsets.Type.statusBars()) != 0
+                && (insets.isVisible(WindowInsets.Type.statusBars())
+                || (android.os.Build.VERSION.SDK_INT < 35
+                && ((window.getAttributes().flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) == 0
+                || (decor.getSystemUiVisibility() & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0)))) return true;
+        return (hideTypes & WindowInsets.Type.navigationBars()) != 0
+                && (insets.isVisible(WindowInsets.Type.navigationBars())
+                || (android.os.Build.VERSION.SDK_INT < 35
+                && (decor.getSystemUiVisibility() & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0));
     }
 
     private void applyLegacySystemUi(Window window, int effective) {

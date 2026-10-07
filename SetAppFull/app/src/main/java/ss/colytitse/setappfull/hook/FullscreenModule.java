@@ -72,7 +72,7 @@ public final class FullscreenModule extends XposedModule {
     @Override public void onPackageReady(PackageReadyParam param) {
         if (main == null && Looper.getMainLooper() != null) main = new Handler(Looper.getMainLooper());
         if (systemServer || main == null || remotePreferences == null || hooksInstalled
-                || !param.isFirstPackage() || "android".equals(param.getPackageName())
+                || "android".equals(param.getPackageName())
                 || MODULE_PACKAGE.equals(param.getPackageName())) return;
         hooksInstalled = true;
         installHook(Instrumentation.class, "callActivityOnResume", new Class<?>[]{Activity.class}, chain -> {
@@ -85,6 +85,18 @@ public final class FullscreenModule extends XposedModule {
             Activity activity = (Activity) chain.getArg(0);
             onMain(() -> destroy(activity));
             return chain.proceed();
+        });
+        installHook(Activity.class, "onResume", new Class<?>[]{}, chain -> {
+            Object result = chain.proceed();
+            Activity activity = (Activity) chain.getThisObject();
+            onMain(() -> resume(activity));
+            return result;
+        });
+        installHook(Activity.class, "onDestroy", new Class<?>[]{}, chain -> {
+            Activity activity = (Activity) chain.getThisObject();
+            Object result = chain.proceed();
+            onMain(() -> destroy(activity));
+            return result;
         });
         installHook(Window.class, "setAttributes", new Class<?>[]{WindowManager.LayoutParams.class}, chain -> {
             Object result = chain.proceed();
@@ -156,13 +168,20 @@ public final class FullscreenModule extends XposedModule {
             return result;
         });
         installHook(View.class, "setSystemUiVisibility", new Class<?>[]{int.class}, chain -> {
-            Object result = chain.proceed();
-            if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
+            if (moduleMutation.get()) return chain.proceed();
+            View view = (View) chain.getThisObject();
+            WindowSession session = sessionForView(view);
+            int requested = (Integer) chain.getArg(0);
+            int corrected = session == null ? requested : session.enforceSystemUiVisibility(requested);
+            Object result = corrected == requested
+                    ? chain.proceed()
+                    : chain.proceedWith(corrected);
+            if (Looper.myLooper() == Looper.getMainLooper()) {
                 // Targets often reset decor visibility after resume or after a WebView relayout.
                 // Reapply every tracked window in this process so the configured bar policy wins
                 // without suppressing the target's original call.
                 onMain(() -> {
-                    for (WindowSession session : new ArrayList<>(windows.values())) session.scheduleApply();
+                    for (WindowSession tracked : new ArrayList<>(windows.values())) tracked.scheduleApply();
                 });
             }
             return result;
@@ -251,6 +270,14 @@ public final class FullscreenModule extends XposedModule {
             reportFailure("Could not inspect secondary window", failure);
         }
         return windows.get(window);
+    }
+
+    private WindowSession sessionForView(View view) {
+        if (view == null) return null;
+        for (WindowSession session : new ArrayList<>(windows.values())) {
+            if (session.ownsView(view)) return session;
+        }
+        return null;
     }
 
     private void destroyWindow(Window window) {
