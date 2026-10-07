@@ -1,29 +1,21 @@
-# SetAppFull pro 2.0.2 验证说明
+# SetAppFull pro 2.0.3 验证说明
 
-[简体中文](VERIFICATION.md) | [English](VERIFICATION_EN.md)
+版本：2.0.3 / 203；包名：`io.github.tianxing226.setappfullpro`。
 
-版本：2.0.2 / 202；独立包名：`io.github.tianxing226.setappfullpro`。
+APK SHA-256：`CB99DC0FD9C5EFDDFD6EF3AF8748FA96393EA8D1E8BD79E6C661716A77587ED2`
 
-APK 构建源码提交：`cb0ac378d1486272fa8bed7c239fca9b7603a2e5`，构建时工作区干净。后续文档提交不改变安装包。
+## 已通过
 
-APK SHA-256：`AE8455BABC0C0975E03EEA3EC2E24374C175B8A4772EB06FC8CDE951D4923F32`。
+- Release 构建、单元测试和 lint。
+- MuMu 回归测试（22/22）。
+- 小米 22127RK46C，Android 17 / API 37：Relief Map 和抖音状态栏、导航栏隐藏正常。
+- Relief Map 顶部白边修复，地图比例和交互保持正常。
+- 正式签名和覆盖安装；版本号仍为 2.0.3。
 
-## 本次完成的检查
+## 限制
 
-- 15 项核心单元测试通过。
-- 新包名的 20 项 Android 16 instrumentation 测试在 1080×2400 / 420 dpi 手机模拟器中通过，包括应用 ID、启动组件、应用列表权限、配置队列和 Compose 界面。
-- 初次在 720×1280 / 320 dpi 环境中有一项搜索测试失败；该用例直接检查 LazyColumn 已组合节点，结果受视口影响。同一 APK 和测试 APK 调整视口后单项及完整 20 项通过，未修改产品或测试代码。原始失败记录已保留；小视口的正式包手动搜索检查未继续执行。
-- Release 构建完成；lint 0 错误、18 条警告；APK v2 签名、ZIP 对齐和所含原生库的 16 KiB 对齐检查通过。
-- APK 内包名、版本、现代 Xposed 入口及构建来源与发布信息一致，继续使用维护分支既有发布签名。
+- 没有 Android 16 独立实体设备，未声明 Android 16 运行时通过。
+- PopupWindow 专用场景未单独完成真机截图回归。
+- DRM、硬件安全合成和厂商安全窗口仍可能禁止截屏。
 
-## 本次没有继续完成的验证
-
-维护者要求停止追加验证并直接提交收录申请，因此没有继续执行 **2.0.2 最终签名包的设备运行矩阵**，也没有完成新包名的框架激活、作用域同步和实际全屏开关的完整运行验收。上述 instrumentation 测试使用调试包，不应当作签名包的全部运行验收。
-
-2.0.1 在 Android 16 / API 101、Android 17 / API 102 和 MuMu 中的签名包验证属于历史记录；2.0.0 的手机／平板完整矩阵也没有在 2.0.2 全部重跑。旧记录见 [2.0.1 验证说明](https://github.com/tianxing226/SetAppFull-pro/blob/65d99e9a14ce1812d39c27b7fc5049dfe60e2c73/docs/VERIFICATION.md)。
-
-厂商 ROM、ARM 真机、实体挖孔屏、小米真实权限弹窗和长期稳定性仍需对应设备验证。README 中图片为 2.0.1 的手机模拟器实拍，仅展示界面。
-
-## 安装说明
-
-新包名意味着独立安装，不能覆盖旧包名的版本，也不会自动继承规则与框架作用域。请启用新模块、重新配置规则和作用域，并关闭旧模块对相同目标应用的作用域。[使用说明](../README.md)
+[返回使用说明](../README.md)

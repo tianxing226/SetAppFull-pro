@@ -8,10 +8,15 @@ An Android module for configuring **immersive fullscreen** per app. Choose how t
 
 This is an independently maintained fork of [cokkeijigen/SetAppFull](https://github.com/cokkeijigen/SetAppFull), not a release published by the original author.
 
+## 2.0.3 update
+
+Fixed status bars remaining visible on some physical devices, improved Activity window handling and libxposed API 101/102 hook forwarding, and removed the extra top strip in Relief Map. See [2.0.3 release notes](RELEASE-2.0.3_EN.md).
+
 ## Features
 
 - **Fullscreen per app:** Save and toggle rules for each app independently.
 - **Hide system bars:** Control the status bar and navigation bar separately for an immersive fullscreen experience.
+- **Allow screenshots per app:** Enable it manually in app details; off by default and subject to DRM and hardware limits.
 - **Use the display cutout area:** Let window content extend into the cutout area; the actual result depends on the app and system.
 - **Check framework status:** The home screen shows the framework connection, version, and API. Settings show rule and scope synchronization status.
 - **Find apps quickly:** Search, filter, and show system apps. On startup, the module checks app-list access and requests required permissions on supported systems.
@@ -21,7 +26,7 @@ Fullscreen rules adjust system bars and the window's display area. They cannot g
 
 ## Screenshots
 
-These are actual screenshots of **version 2.0.1** from an **Android 17 phone emulator**. They show the home and rule settings screens and do not represent test results for the new package-name version. Probe is a test app included with the source.
+These screenshots show the maintained branch home and rule settings screens. Probe is a test app included with the source.
 
 <table>
   <tr>
@@ -55,7 +60,7 @@ Version 2.0.2 installs as a new app and can coexist with the original app or mai
 
 ## Compatibility and verification
 
-See the [verification notes](docs/VERIFICATION_EN.md) for results using the new package name in 2.0.2.
+See the [verification notes](docs/VERIFICATION_EN.md) for the 2.0.3 results.
 
 Fullscreen policies are suspended in multi-window, picture-in-picture, and floating-window modes. Navigation bar control is released when the keyboard appears. Android 11 / 12 use simplified navigation behavior.
 
