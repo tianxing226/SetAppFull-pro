@@ -92,7 +92,8 @@ public final class FullscreenModule extends XposedModule {
                 if (session != null) {
                     WindowManager.LayoutParams params = (WindowManager.LayoutParams) chain.getArg(0);
                     session.observeCutoutRequest(params.layoutInDisplayCutoutMode);
-                    session.observeSecureRequest((params.flags & WindowManager.LayoutParams.FLAG_SECURE) != 0);
+                    session.observeAttributesSecureRequest(
+                            (params.flags & WindowManager.LayoutParams.FLAG_SECURE) != 0);
                     session.scheduleApply();
                 }
             }

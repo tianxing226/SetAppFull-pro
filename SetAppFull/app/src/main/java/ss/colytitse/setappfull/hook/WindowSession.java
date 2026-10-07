@@ -151,6 +151,13 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
         }
     }
 
+    /** LayoutParams often mirror the flag after our own clearFlags call. Do not treat that mirror
+     * as the target explicitly removing its original secure request; explicit clearFlags remains
+     * observable through the dedicated Window hook. */
+    void observeAttributesSecureRequest(boolean secure) {
+        if (!screenshotControlled || secure) observeSecureRequest(secure);
+    }
+
     void apply(boolean force) {
         Activity activity = activityReference.get();
         Window window = windowReference.get();
