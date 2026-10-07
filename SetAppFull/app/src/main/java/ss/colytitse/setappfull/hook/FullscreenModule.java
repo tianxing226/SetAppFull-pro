@@ -125,8 +125,14 @@ public final class FullscreenModule extends XposedModule {
             Object result = chain.proceed();
             if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
                 WindowSession session = sessionFor((Window) chain.getThisObject());
-                if (session != null && (((Integer) chain.getArg(0)) & WindowManager.LayoutParams.FLAG_SECURE) != 0) {
-                    session.observeSecureRequest(true);
+                if (session != null) {
+                    int flags = (Integer) chain.getArg(0);
+                    if ((flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0) {
+                        session.observeFlagsRequest(flags, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                    }
+                    if ((flags & WindowManager.LayoutParams.FLAG_SECURE) != 0) {
+                        session.observeSecureRequest(true);
+                    }
                     session.scheduleApply();
                 }
             }
@@ -136,8 +142,14 @@ public final class FullscreenModule extends XposedModule {
             Object result = chain.proceed();
             if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
                 WindowSession session = sessionFor((Window) chain.getThisObject());
-                if (session != null && (((Integer) chain.getArg(0)) & WindowManager.LayoutParams.FLAG_SECURE) != 0) {
-                    session.observeSecureRequest(false);
+                if (session != null) {
+                    int flags = (Integer) chain.getArg(0);
+                    if ((flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0) {
+                        session.observeFlagsRequest(0, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                    }
+                    if ((flags & WindowManager.LayoutParams.FLAG_SECURE) != 0) {
+                        session.observeSecureRequest(false);
+                    }
                     session.scheduleApply();
                 }
             }
@@ -150,7 +162,7 @@ public final class FullscreenModule extends XposedModule {
                 // Reapply every tracked window in this process so the configured bar policy wins
                 // without suppressing the target's original call.
                 onMain(() -> {
-                    for (WindowSession session : new ArrayList<>(windows.values())) session.apply(true);
+                    for (WindowSession session : new ArrayList<>(windows.values())) session.scheduleApply();
                 });
             }
             return result;
