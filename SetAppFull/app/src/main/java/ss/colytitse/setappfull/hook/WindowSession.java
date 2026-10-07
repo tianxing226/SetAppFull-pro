@@ -19,10 +19,10 @@ import ss.colytitse.setappfull.core.WindowPolicy;
 final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
         ViewTreeObserver.OnWindowFocusChangeListener, View.OnAttachStateChangeListener {
     private final FullscreenModule module;
-    private final WeakReference<Activity> activityReference;
+    private WeakReference<Activity> activityReference;
     private final WeakReference<Window> windowReference;
-    private final String packageName;
-    private final boolean floating;
+    private String packageName;
+    private boolean floating;
     private int requestedCutout;
     private int requestedVisibleBars;
     private int originalBarBehavior;
@@ -70,6 +70,17 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
         this.packageName = packageName;
         this.requestedCutout = window.getAttributes().layoutInDisplayCutoutMode;
         this.floating = floating;
+    }
+
+    /** Promote a lazily tracked Activity window without losing its existing restore baselines. */
+    void bindActivity(Activity activity) {
+        Window window = windowReference.get();
+        if (activity == null || window == null || activity.getWindow() != window) return;
+        activityReference = new WeakReference<>(activity);
+        packageName = activity.getPackageName();
+        TypedValue value = new TypedValue();
+        floating = activity.getTheme().resolveAttribute(android.R.attr.windowIsFloating, value, true)
+                && value.data != 0;
     }
 
     void attach() {
@@ -215,7 +226,8 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
                 requestedFullscreenFlag = originalFullscreenFlag;
                 systemUiBaselineCaptured = true;
             }
-            int effective = WindowPolicy.effectiveRule(module.ruleFor(packageName),
+            int configured = module.ruleFor(packageName);
+            int effective = WindowPolicy.effectiveRule(configured,
                     activity != null && activity.isInMultiWindowMode(),
                     activity != null && activity.isInPictureInPictureMode(), floating,
                     insets.isVisible(WindowInsets.Type.ime()));
@@ -223,7 +235,9 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
             int previous = lastEffectiveRule;
             module.mutate(() -> applyPolicy(window, controller, effective));
             lastEffectiveRule = effective;
-            if (previous != effective && (previous > 0 || effective > 0)) module.reportApplied(packageName, effective);
+            if (previous != effective && (configured > 0 || previous > 0 || effective > 0)) {
+                module.reportApplied(packageName, configured, effective, activity != null, floating);
+            }
         } catch (RuntimeException | LinkageError failure) {
             module.reportFailure("Could not apply window policy for " + packageName, failure);
         }

@@ -3,6 +3,7 @@ package ss.colytitse.setappfull.hook;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.app.Instrumentation;
 import android.content.SharedPreferences;
 import android.os.Build;
@@ -20,6 +21,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -62,8 +64,10 @@ public final class FullscreenModule extends XposedModule {
             // Register before the first snapshot so a concurrent write is not missed.
             remotePreferences.registerOnSharedPreferenceChangeListener(preferenceListener);
             refreshRules();
-            log(Log.INFO, TAG, "Module loaded: process=" + param.getProcessName()
-                    + ", Android API=" + Build.VERSION.SDK_INT + ", Xposed API=" + getApiVersion());
+            String message = "Module loaded: process=" + param.getProcessName()
+                    + ", Android API=" + Build.VERSION.SDK_INT + ", Xposed API=" + getApiVersion();
+            log(Log.INFO, TAG, message);
+            Log.i(TAG, message);
         } catch (RuntimeException failure) {
             reportFailure("Remote preferences initialization failed; policy remains disabled", failure);
         }
@@ -175,7 +179,7 @@ public final class FullscreenModule extends XposedModule {
             int corrected = session == null ? requested : session.enforceSystemUiVisibility(requested);
             Object result = corrected == requested
                     ? chain.proceed()
-                    : chain.proceedWith(corrected);
+                    : chain.proceed(new Object[]{corrected});
             if (Looper.myLooper() == Looper.getMainLooper()) {
                 // Targets often reset decor visibility after resume or after a WebView relayout.
                 // Reapply every tracked window in this process so the configured bar policy wins
@@ -237,6 +241,10 @@ public final class FullscreenModule extends XposedModule {
             session = new WindowSession(this, activity);
             windows.put(window, session);
             session.attach();
+        } else {
+            // Flag setters can create a conservative secondary-window session before onResume.
+            // Promote that same session so its security and system-bar baselines are retained.
+            session.bindActivity(activity);
         }
         session.apply(true);
     }
@@ -265,11 +273,30 @@ public final class FullscreenModule extends XposedModule {
         if (session != null || window == null) return session;
         try {
             Context context = window.getContext();
-            if (context != null) trackWindow(window, context.getPackageName(), true);
+            Activity owner = findActivityOwner(window, context);
+            if (owner != null) {
+                resume(owner);
+            } else if (context != null) {
+                trackWindow(window, context.getPackageName(), true);
+            }
         } catch (RuntimeException failure) {
             reportFailure("Could not inspect secondary window", failure);
         }
         return windows.get(window);
+    }
+
+    /** A Dialog may wrap an Activity context, but it owns a different Window. */
+    private Activity findActivityOwner(Window window, Context context) {
+        Set<Context> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        while (context != null && visited.add(context)) {
+            if (context instanceof Activity) {
+                Activity activity = (Activity) context;
+                return activity.getWindow() == window ? activity : null;
+            }
+            if (!(context instanceof ContextWrapper)) return null;
+            context = ((ContextWrapper) context).getBaseContext();
+        }
+        return null;
     }
 
     private WindowSession sessionForView(View view) {
@@ -350,10 +377,19 @@ public final class FullscreenModule extends XposedModule {
 
     void reportFailure(String message, Throwable failure) {
         // Bound repeated vendor-specific failures instead of filling target-app logs.
-        if (errorCount++ < 8) log(Log.WARN, TAG, message, failure);
+        if (errorCount++ < 8) {
+            log(Log.WARN, TAG, message, failure);
+            // Mirror only a bounded error type; app page content and exception text stay private.
+            Log.w(TAG, message + " (" + failure.getClass().getSimpleName() + ")");
+        }
     }
 
-    void reportApplied(String packageName, int effectiveRule) {
-        log(Log.INFO, TAG, "Window policy: package=" + packageName + ", rule=" + effectiveRule);
+    void reportApplied(String packageName, int configuredRule, int effectiveRule,
+                       boolean activityWindow, boolean floating) {
+        String message = "Window policy: package=" + packageName + ", configured=" + configuredRule
+                + ", rule=" + effectiveRule + ", owner=" + (activityWindow ? "Activity" : "secondary")
+                + ", floating=" + floating;
+        log(Log.INFO, TAG, message);
+        Log.i(TAG, message);
     }
 }

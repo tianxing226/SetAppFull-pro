@@ -10,5 +10,6 @@
         <activity android:name=".ComposeProbeActivity" android:exported="true" android:resizeableActivity="true" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".WebProbeActivity" android:exported="true" android:resizeableActivity="true" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".SurfaceProbeActivity" android:exported="true" android:resizeableActivity="true" />
+        <activity android:name=".StatusBarRegressionActivity" android:exported="true" android:resizeableActivity="true" android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>
