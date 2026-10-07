@@ -1,6 +1,8 @@
 package ss.colytitse.setappfull.hook;
 
 import android.app.Activity;
+import android.app.Dialog;
+import android.content.Context;
 import android.app.Instrumentation;
 import android.content.SharedPreferences;
 import android.os.Build;
@@ -86,9 +88,11 @@ public final class FullscreenModule extends XposedModule {
         installHook(Window.class, "setAttributes", new Class<?>[]{WindowManager.LayoutParams.class}, chain -> {
             Object result = chain.proceed();
             if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
-                WindowSession session = windows.get((Window) chain.getThisObject());
+                WindowSession session = sessionFor((Window) chain.getThisObject());
                 if (session != null) {
-                    session.observeCutoutRequest(((WindowManager.LayoutParams) chain.getArg(0)).layoutInDisplayCutoutMode);
+                    WindowManager.LayoutParams params = (WindowManager.LayoutParams) chain.getArg(0);
+                    session.observeCutoutRequest(params.layoutInDisplayCutoutMode);
+                    session.observeSecureRequest((params.flags & WindowManager.LayoutParams.FLAG_SECURE) != 0);
                     session.scheduleApply();
                 }
             }
@@ -97,12 +101,52 @@ public final class FullscreenModule extends XposedModule {
         installHook(Window.class, "setFlags", new Class<?>[]{int.class, int.class}, chain -> {
             Object result = chain.proceed();
             if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
-                WindowSession session = windows.get((Window) chain.getThisObject());
+                WindowSession session = sessionFor((Window) chain.getThisObject());
                 if (session != null) {
                     session.observeFlagsRequest((Integer) chain.getArg(0), (Integer) chain.getArg(1));
                     session.scheduleApply();
                 }
             }
+            return result;
+        });
+        installHook(Window.class, "addFlags", new Class<?>[]{int.class}, chain -> {
+            Object result = chain.proceed();
+            if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
+                WindowSession session = sessionFor((Window) chain.getThisObject());
+                if (session != null && (((Integer) chain.getArg(0)) & WindowManager.LayoutParams.FLAG_SECURE) != 0) {
+                    session.observeSecureRequest(true);
+                    session.scheduleApply();
+                }
+            }
+            return result;
+        });
+        installHook(Window.class, "clearFlags", new Class<?>[]{int.class}, chain -> {
+            Object result = chain.proceed();
+            if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
+                WindowSession session = sessionFor((Window) chain.getThisObject());
+                if (session != null && (((Integer) chain.getArg(0)) & WindowManager.LayoutParams.FLAG_SECURE) != 0) {
+                    session.observeSecureRequest(false);
+                    session.scheduleApply();
+                }
+            }
+            return result;
+        });
+        installHook(Dialog.class, "show", new Class<?>[]{}, chain -> {
+            Object result = chain.proceed();
+            Dialog dialog = (Dialog) chain.getThisObject();
+            if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
+                Window window = dialog.getWindow();
+                if (window != null && dialog.getContext() != null) {
+                    trackWindow(window, dialog.getContext().getPackageName(), true);
+                }
+            }
+            return result;
+        });
+        installHook(Dialog.class, "dismiss", new Class<?>[]{}, chain -> {
+            Dialog dialog = (Dialog) chain.getThisObject();
+            Window window = dialog.getWindow();
+            Object result = chain.proceed();
+            if (window != null) destroyWindow(window);
             return result;
         });
     }
@@ -136,6 +180,37 @@ public final class FullscreenModule extends XposedModule {
 
     private void destroy(Activity activity) {
         WindowSession session = windows.remove(activity.getWindow());
+        if (session != null) session.detach();
+    }
+
+    private void trackWindow(Window window, String packageName, boolean floating) {
+        if (window == null || packageName == null || MODULE_PACKAGE.equals(packageName)
+                || "android".equals(packageName)) return;
+        WindowSession session = windows.get(window);
+        if (session == null) {
+            session = new WindowSession(this, window, packageName, floating);
+            windows.put(window, session);
+            session.attach();
+        }
+        session.apply(true);
+    }
+
+    /** Dialog and PopupWindow use a Window without an Activity callback. Track it lazily when a
+     * target itself changes flags, so secure-window handling remains package scoped. */
+    private WindowSession sessionFor(Window window) {
+        WindowSession session = windows.get(window);
+        if (session != null || window == null) return session;
+        try {
+            Context context = window.getContext();
+            if (context != null) trackWindow(window, context.getPackageName(), true);
+        } catch (RuntimeException failure) {
+            reportFailure("Could not inspect secondary window", failure);
+        }
+        return windows.get(window);
+    }
+
+    private void destroyWindow(Window window) {
+        WindowSession session = windows.remove(window);
         if (session != null) session.detach();
     }
 

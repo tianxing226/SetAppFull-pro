@@ -238,6 +238,50 @@ class SetAppFullUiTest {
     }
 
     @Test
+    fun screenshotPermissionIsOffByDefaultAndOnlyDetailsCanEnableIt() {
+        val state = mutableStateOf(UiState(apps = listOf(alpha), loading = false))
+        val changes = mutableListOf<Triple<String, Int, Boolean>>()
+        compose.setContent {
+            TestApp(state, onRuleChange = { packageName, option, enabled ->
+                changes += Triple(packageName, option, enabled)
+                state.value = state.value.copy(apps = state.value.apps.map {
+                    if (it.packageName == packageName) it.copy(flags = if (enabled) it.flags or option else it.flags and option.inv()) else it
+                })
+            })
+        }
+        compose.onNodeWithTag("nav_1").performClick()
+        scrollTo("app_row_test.alpha").performClick()
+        compose.onNodeWithContentDescription("允许截屏").performScrollTo().assertIsOff().performClick()
+        compose.onNodeWithTag("screenshot_confirm_dialog").assertIsDisplayed()
+        compose.runOnIdle { assertTrue(changes.isEmpty()) }
+        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithContentDescription("允许截屏").assertIsOff().performClick()
+        compose.onNodeWithTag("confirm_screenshot").performClick()
+        compose.runOnIdle {
+            assertEquals(listOf(Triple("test.alpha", 16, true)), changes)
+        }
+        compose.onNodeWithTag("rules_dialog").assertIsDisplayed()
+        compose.onNodeWithContentDescription("允许截屏").assertIsOn()
+    }
+
+    @Test
+    fun fullscreenToggleDoesNotImplicitlyEnableScreenshot() {
+        val state = mutableStateOf(UiState(apps = listOf(alpha), loading = false))
+        val toggles = mutableListOf<Pair<String, Boolean>>()
+        val changes = mutableListOf<Triple<String, Int, Boolean>>()
+        compose.setContent {
+            TestApp(state, onToggle = { packageName, enabled -> toggles += packageName to enabled },
+                onRuleChange = { packageName, option, enabled -> changes += Triple(packageName, option, enabled) })
+        }
+        compose.onNodeWithTag("nav_1").performClick()
+        scrollTo("app_toggle_test.alpha").performClick()
+        compose.runOnIdle {
+            assertEquals(listOf("test.alpha" to true), toggles)
+            assertTrue(changes.isEmpty())
+        }
+    }
+
+    @Test
     fun enablingSystemAppNeedsConfirmationFromBothEntryPointsButDisablingDoesNot() {
         val state = mutableStateOf(UiState(apps = listOf(system), showSystem = true, loading = false))
         val toggles = mutableListOf<Pair<String, Boolean>>()

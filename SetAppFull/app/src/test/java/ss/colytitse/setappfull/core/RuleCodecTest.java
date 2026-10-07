@@ -11,6 +11,8 @@ public class RuleCodecTest {
         assertEquals(8, RuleCodec.withEnabled(9, false));
         assertEquals(9, RuleCodec.withEnabled(8, true));
         assertEquals(1, RuleCodec.withEnabled(1, true));
+        assertEquals(16, RuleCodec.withEnabled(16, false));
+        assertEquals(31, RuleCodec.withEnabled(16, true));
     }
 
     @Test public void wireFormatRejectsMalformedTypesAndKeys() {
@@ -20,7 +22,7 @@ public class RuleCodecTest {
                 "rule.com.boolean", true,
                 "rule.bad/name", 15,
                 "unrelated", 15));
-        assertEquals(Map.of("com.valid", 15), decoded);
+        assertEquals(Map.of("com.valid", 31), decoded);
     }
 
     @Test public void migratesBothHistoricalAppKeysWithoutEnablingAllScope() {

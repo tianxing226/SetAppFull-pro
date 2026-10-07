@@ -168,7 +168,8 @@ class AppRepository(private val app: Application) {
     }
 
     fun setOption(packageName: String, option: Int, enabled: Boolean) = enqueue {
-        require(option == 2 || option == 4 || option == 8)
+        require(option == RuleCodec.HIDE_STATUS || option == RuleCodec.HIDE_NAVIGATION ||
+            option == RuleCodec.ALLOW_CUTOUT || option == RuleCodec.ALLOW_SCREENSHOT)
         // Read inside the queue: different switches may be tapped before UI state catches up.
         val previous = local.getInt(PREFIX + packageName, 0)
         writeRule(packageName, if (enabled) previous or option else previous and option.inv())
@@ -177,7 +178,7 @@ class AppRepository(private val app: Application) {
     private fun writeRule(packageName: String, flags: Int) {
         require(packageName !in excluded && PACKAGE.matches(packageName))
         val key = PREFIX + packageName
-        check(local.edit().putInt(key, flags and 15).putBoolean("dirty.$key", true).commit())
+        check(local.edit().putInt(key, flags and RuleCodec.ALL_FLAGS).putBoolean("dirty.$key", true).commit())
         refreshLocked()
     }
 

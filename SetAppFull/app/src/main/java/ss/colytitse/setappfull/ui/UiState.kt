@@ -1,6 +1,7 @@
 package ss.colytitse.setappfull.ui
 
 import android.graphics.drawable.Drawable
+import ss.colytitse.setappfull.core.RuleCodec
 
 /** The service connection and each target's scope are intentionally separate states. */
 enum class FrameworkStatus { CHECKING, CONNECTED, UNAVAILABLE, DISCONNECTED, UNSUPPORTED }
@@ -32,5 +33,6 @@ data class AppRow(
     val isSystem: Boolean = false,
     val syncMessage: String = "",
 ) {
-    val enabled: Boolean get() = flags and 1 != 0
+    val enabled: Boolean get() = flags and RuleCodec.ENABLED != 0
+    val allowScreenshot: Boolean get() = flags and RuleCodec.ALLOW_SCREENSHOT != 0
 }

@@ -7,7 +7,10 @@ public final class WindowPolicy {
     public static int effectiveRule(int configured, boolean multiWindow, boolean pictureInPicture,
                                     boolean floatingWindow, boolean keyboardVisible) {
         int flags = RuleCodec.normalize(configured);
-        if (!RuleCodec.isEnabled(flags) || multiWindow || pictureInPicture || floatingWindow) return 0;
-        return keyboardVisible ? flags & ~RuleCodec.HIDE_NAVIGATION : flags;
+        // Screenshot permission is deliberately independent from the fullscreen master switch.
+        // Preserve it even when geometry control is suspended for dialogs, PiP or multi-window.
+        int screenshot = flags & RuleCodec.ALLOW_SCREENSHOT;
+        if (!RuleCodec.isEnabled(flags) || multiWindow || pictureInPicture || floatingWindow) return screenshot;
+        return keyboardVisible ? (flags & ~RuleCodec.HIDE_NAVIGATION) : flags;
     }
 }

@@ -9,6 +9,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,7 +58,9 @@ import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.highlight.Highlight
 import ss.colytitse.setappfull.BuildConfig
+import ss.colytitse.setappfull.core.RuleCodec
 import ss.colytitse.setappfull.R
+import androidx.compose.material3.ripple
 
 private val LightPalette = lightColorScheme(
     primary = Color(0xFF6554BE), onPrimary = Color.White,
@@ -93,6 +100,7 @@ fun SetAppFullApp(
         var page by rememberSaveable { mutableIntStateOf(0) }
         var detailsPackage by rememberSaveable { mutableStateOf<String?>(null) }
         var pendingSystemPackage by rememberSaveable { mutableStateOf<String?>(null) }
+        var pendingScreenshotPackage by rememberSaveable { mutableStateOf<String?>(null) }
         var resetDialog by rememberSaveable { mutableStateOf(false) }
         var accessNoticeDismissed by rememberSaveable { mutableStateOf(false) }
         val accessNeedsAttention = state.appListAccess == AppListAccess.DENIED || state.appListAccess == AppListAccess.ERROR
@@ -108,7 +116,7 @@ fun SetAppFullApp(
             }
         }
         val backdrop = rememberLayerBackdrop()
-        val navigationHeight = (76 * LocalDensity.current.fontScale.coerceIn(1f, 1.65f)).dp
+        val navigationHeight = (64 * LocalDensity.current.fontScale.coerceIn(1f, 1.55f)).dp
         Box(Modifier.fillMaxSize().imePadding().background(MaterialTheme.colorScheme.background).testTag("app_root")) {
             Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
                 AmbientBackground(dark)
@@ -158,7 +166,27 @@ fun SetAppFullApp(
         }
         val detailedApp = state.apps.firstOrNull { it.packageName == detailsPackage }
         if (detailedApp != null) {
-            RulesDialog(detailedApp, guardedToggle, onRuleChange, onScopeRequest) { detailsPackage = null }
+            RulesDialog(detailedApp, guardedToggle, onRuleChange, onScopeRequest,
+                onScreenshotChange = { packageName, enabled ->
+                    if (enabled && !detailedApp.allowScreenshot) pendingScreenshotPackage = packageName
+                    else onRuleChange(packageName, RuleCodec.ALLOW_SCREENSHOT, enabled)
+                }) { detailsPackage = null }
+        }
+        val pendingScreenshotApp = state.apps.firstOrNull { it.packageName == pendingScreenshotPackage }
+        if (pendingScreenshotApp != null) {
+            AlertDialog(
+                onDismissRequest = { pendingScreenshotPackage = null },
+                modifier = Modifier.testTag("screenshot_confirm_dialog"),
+                title = { Text("允许「${pendingScreenshotApp.label}」截屏？") },
+                text = { Text("只对当前应用生效。DRM、银行、安全页面或硬件保护内容仍可能无法截屏；请仅用于你有权操作的应用和内容。关闭后会恢复该应用原有的安全窗口行为。") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        pendingScreenshotPackage = null
+                        onRuleChange(pendingScreenshotApp.packageName, RuleCodec.ALLOW_SCREENSHOT, true)
+                    }, modifier = Modifier.testTag("confirm_screenshot")) { Text("允许截屏") }
+                },
+                dismissButton = { TextButton(onClick = { pendingScreenshotPackage = null }) { Text("取消") } },
+            )
         }
         val pendingSystemApp = state.apps.firstOrNull { it.packageName == pendingSystemPackage }
         if (pendingSystemApp != null) {
@@ -477,6 +505,8 @@ private fun ApplicationCard(app: AppRow, onToggle: (Boolean) -> Unit, onDetails:
                         style = MaterialTheme.typography.labelSmall,
                         color = if (app.inScope == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
                 }
+                if (app.allowScreenshot) Text("允许截屏（仅详情页可关闭）", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary)
                 if (app.syncMessage.isNotBlank()) Text(app.syncMessage, style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -499,7 +529,8 @@ private fun AppIcon(app: AppRow) {
 @Composable
 private fun RulesDialog(
     app: AppRow, onToggle: (String, Boolean) -> Unit, onRuleChange: (String, Int, Boolean) -> Unit,
-    onScopeRequest: (String) -> Unit, onDismiss: () -> Unit,
+    onScopeRequest: (String) -> Unit, onScreenshotChange: (String, Boolean) -> Unit,
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(onDismissRequest = onDismiss, modifier = Modifier.testTag("rules_dialog"),
         title = { Text(app.label) },
@@ -517,6 +548,8 @@ private fun RulesDialog(
                 RuleRow("延伸至挖孔区域", "允许内容绘制到屏幕缺口附近", app.flags and 8 != 0, app.enabled) {
                     onRuleChange(app.packageName, 8, it)
                 }
+                RuleRow("允许截屏", "仅当前应用；部分 DRM 或硬件保护内容仍可能无法截屏",
+                    app.allowScreenshot, enabled = true) { onScreenshotChange(app.packageName, it) }
                 HorizontalDivider()
                 Text(when (app.inScope) {
                     true -> "已加入框架作用域。规则变化后，请重新启动此应用并检查显示效果。"
@@ -528,6 +561,8 @@ private fun RulesDialog(
                 if (app.syncMessage.isNotBlank()) Text(app.syncMessage, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary)
                 Text("全屏不会改变应用自身的画面比例；应用内部留白可能仍然保留。",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("允许截屏与全屏规则独立，仅能在此详情页手动开启。关闭后恢复原应用安全窗口行为。",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
@@ -578,19 +613,29 @@ private fun GlassNavigation(
         .then(glass).padding(7.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf("主页" to AppIcons.Home, "设置" to AppIcons.Settings).forEachIndexed { index, (label, icon) ->
             val active = selected == index
+            val interactionSource = remember { MutableInteractionSource() }
+            val pressed by interactionSource.collectIsPressedAsState()
+            val focused by interactionSource.collectIsFocusedAsState()
             val background by animateColorAsState(
                 if (active) MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (dark) 0.82f else 0.68f)
                 else Color.Transparent, label = "tabColor")
-            val scale by animateFloatAsState(if (active) 1f else 0.97f,
-                animationSpec = spring(dampingRatio = 0.72f), label = "tabScale")
-            Column(Modifier.weight(1f).fillMaxHeight().graphicsLayer { scaleX = scale; scaleY = scale }
+            val scale by animateFloatAsState(
+                when { pressed -> 0.95f; focused -> 1.015f; active -> 1f; else -> 0.985f },
+                animationSpec = spring(dampingRatio = 0.78f), label = "tabScale")
+            val alpha by animateFloatAsState(if (pressed) 0.82f else 1f,
+                animationSpec = spring(dampingRatio = 0.8f), label = "tabAlpha")
+            Column(Modifier.weight(1f).fillMaxHeight().graphicsLayer { scaleX = scale; scaleY = scale; this.alpha = alpha }
                 .clip(RoundedCornerShape(34.dp)).background(background)
-                .selectable(active, role = Role.Tab, onClick = { onSelect(index) }).testTag("nav_$index")
-                .padding(horizontal = 8.dp, vertical = 5.dp),
+                .indication(interactionSource, ripple())
+                .selectable(active, role = Role.Tab, onClick = { onSelect(index) },
+                    indication = null, interactionSource = interactionSource)
+                .focusable()
+                .testTag("nav_$index")
+                .padding(horizontal = 6.dp, vertical = 2.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 val color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                Icon(icon, null, Modifier.size(23.dp), tint = color)
-                Spacer(Modifier.height(3.dp))
+                Icon(icon, null, Modifier.size(20.dp), tint = color)
+                Spacer(Modifier.height(2.dp))
                 Text(label, color = color, fontSize = 12.sp, lineHeight = 15.sp,
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
             }

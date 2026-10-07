@@ -15,7 +15,10 @@ public final class RuleCodec {
     public static final int HIDE_STATUS = 1 << 1;
     public static final int HIDE_NAVIGATION = 1 << 2;
     public static final int ALLOW_CUTOUT = 1 << 3;
+    /** Explicit per-app opt-in for clearing FLAG_SECURE. Kept outside ENABLED semantics. */
+    public static final int ALLOW_SCREENSHOT = 1 << 4;
     public static final int DEFAULT_ENABLED = ENABLED | HIDE_STATUS | HIDE_NAVIGATION | ALLOW_CUTOUT;
+    public static final int ALL_FLAGS = DEFAULT_ENABLED | ALLOW_SCREENSHOT;
     private static final Pattern PACKAGE = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+");
 
     private RuleCodec() {}
@@ -30,7 +33,7 @@ public final class RuleCodec {
     }
 
     public static int normalize(int flags) {
-        return flags & DEFAULT_ENABLED;
+        return flags & ALL_FLAGS;
     }
 
     public static boolean isEnabled(int flags) {
@@ -41,7 +44,9 @@ public final class RuleCodec {
     public static int withEnabled(int flags, boolean enabled) {
         int normalized = normalize(flags);
         if (!enabled) return normalized & ~ENABLED;
-        return normalized == 0 ? DEFAULT_ENABLED : normalized | ENABLED;
+        int geometry = HIDE_STATUS | HIDE_NAVIGATION | ALLOW_CUTOUT;
+        boolean screenshotOnly = (normalized & ALLOW_SCREENSHOT) != 0 && (normalized & geometry) == 0;
+        return (normalized == 0 || screenshotOnly) ? normalized | DEFAULT_ENABLED : normalized | ENABLED;
     }
 
     /** Invalid values fail closed; never coerce strings or booleans into enabled rules. */

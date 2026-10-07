@@ -15,4 +15,13 @@ public class WindowPolicyTest {
         assertEquals(0, WindowPolicy.effectiveRule(14, false, false, false, true));
         assertEquals(15, WindowPolicy.effectiveRule(15, false, false, false, false));
     }
+
+    @Test public void screenshotPermissionSurvivesWithoutFullscreenAndSpecialWindows() {
+        assertEquals(RuleCodec.ALLOW_SCREENSHOT,
+                WindowPolicy.effectiveRule(RuleCodec.ALLOW_SCREENSHOT, false, false, false, false));
+        assertEquals(RuleCodec.ALLOW_SCREENSHOT,
+                WindowPolicy.effectiveRule(RuleCodec.ALLOW_SCREENSHOT, true, false, false, false));
+        assertEquals(RuleCodec.ALLOW_SCREENSHOT,
+                WindowPolicy.effectiveRule(RuleCodec.ALLOW_SCREENSHOT, false, true, false, false));
+    }
 }
