@@ -1,5 +1,7 @@
 # SetAppFull pro
 
+[简体中文](README.md) | [English](README_EN.md)
+
 按应用设置**沉浸式全屏**的 Android 模块，让状态栏、导航栏和屏幕挖孔区域按你的需要显示。支持现代 LSPosed / libxposed API 101、102。
 
 **[下载正式版 APK](https://github.com/tianxing226/SetAppFull-pro/releases/latest)** · [Telegram 频道](https://t.me/tiaxcj) · [验证说明](docs/VERIFICATION.md)
@@ -45,17 +47,20 @@
 
 标准 Android 的应用列表权限在安装时授予，不会额外弹窗；部分厂商系统需要单独授权。列表不完整时，可在设置页打开系统权限设置。
 
-**从 2.0.2 起使用独立包名 `io.github.tianxing226.setappfullpro`。** Android 会把它识别为新应用，可与原版或维护版 2.0.0 / 2.0.1 同时安装；旧版规则和框架作用域不会自动继承。请重新启用新模块、选择应用并设置规则，同时关闭旧模块对相同应用的作用域，避免两个模块同时控制窗口。
+**从 2.0.2 起使用独立包名 `io.github.tianxing226.setappfullpro`。** 
+
+### 从旧版迁移
+
+2.0.2 会作为新应用安装，可与原版或维护版 2.0.0 / 2.0.1 共存，不会覆盖旧版。旧应用的私有配置和框架作用域不会自动继承。安装并启用新模块后，请重新选择目标应用的作用域并设置全屏规则，再关闭旧模块对相同应用的作用域，最后重启目标应用检查效果。无需先卸载旧版；可在确认新版本配置完成前保留旧版及其规则。
 
 ## 兼容与验证
 
-2.0.2 的新包名验证结果以 [验证说明](docs/VERIFICATION.md) 为准。历史版本 2.0.1 已在 Android 16 / API 101、Android 17 / API 102 手机模拟器和 MuMu 中完成相应回归验证；Android 16 / 17 平板的完整矩阵记录来自 2.0.0。这些历史记录不能替代新包名版本的验证。厂商 ROM、ARM 真机和实体挖孔屏仍需实际验证，小米授权弹窗也尚未经过真机测试。
+2.0.2 的新包名验证结果以 [验证说明](docs/VERIFICATION.md) 为准。
 
 多窗口、画中画和浮动窗口会暂停全屏策略，输入法出现时会释放导航栏控制。Android 11 / 12 使用简化导航效果。
 
 ## 源码与致谢
 
-- [构建与维护说明](MODERNIZATION.md) · [2.0.2 更新说明](RELEASE-2.0.2.md)
 - 上游：[cokkeijigen/SetAppFull](https://github.com/cokkeijigen/SetAppFull)，保留原作者归属，采用 [AGPL-3.0](LICENSE) 许可证。
 - 液态玻璃：[Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) / Backdrop。
 - 其他依赖及许可见 [第三方声明](THIRD_PARTY_NOTICES.md)。

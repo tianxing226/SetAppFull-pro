@@ -1,5 +1,7 @@
 # SetAppFull pro 2.0.2 验证说明
 
+[简体中文](VERIFICATION.md) | [English](VERIFICATION_EN.md)
+
 版本：2.0.2 / 202；独立包名：`io.github.tianxing226.setappfullpro`。
 
 APK 构建源码提交：`cb0ac378d1486272fa8bed7c239fca9b7603a2e5`，构建时工作区干净。后续文档提交不改变安装包。

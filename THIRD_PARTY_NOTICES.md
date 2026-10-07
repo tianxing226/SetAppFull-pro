@@ -1,5 +1,7 @@
 # 第三方来源与许可证
 
+[简体中文](THIRD_PARTY_NOTICES.md) | [English](THIRD_PARTY_NOTICES_EN.md)
+
 SetAppFull 原项目：<https://github.com/cokkeijigen/SetAppFull>，AGPL-3.0，完整许可证保存在根目录 LICENSE。
 
 液态玻璃采用 Kyant0 的 AndroidLiquidGlass / Backdrop 作为依赖，保留其作者归属：<https://github.com/Kyant0/AndroidLiquidGlass>。实现遵循其公共 API，版本为 2.0.1；许可证为 Apache License 2.0。
