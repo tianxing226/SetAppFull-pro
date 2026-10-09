@@ -50,8 +50,8 @@ android {
         applicationId = "io.github.tianxing226.setappfullpro"
         minSdk = 30
         targetSdk = 37
-        versionCode = 203
-        versionName = "2.0.3"
+        versionCode = 205
+        versionName = "2.0.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {

@@ -550,6 +550,10 @@ private fun RulesDialog(
                 }
                 RuleRow("允许截屏", "仅当前应用；部分 DRM 或硬件保护内容仍可能无法截屏",
                     app.allowScreenshot, enabled = true) { onScreenshotChange(app.packageName, it) }
+                RuleRow("VPN 检测兼容", "仅当前应用；默认关闭，兼容常见 Android VPN 状态接口；不改变代理路由或 TLS 校验",
+                    app.networkEnvironmentCompat, enabled = true) {
+                    onRuleChange(app.packageName, RuleCodec.COMPAT_NETWORK_ENVIRONMENT, it)
+                }
                 HorizontalDivider()
                 Text(when (app.inScope) {
                     true -> "已加入框架作用域。规则变化后，请重新启动此应用并检查显示效果。"

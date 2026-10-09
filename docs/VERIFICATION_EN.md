@@ -1,21 +1,11 @@
-# SetAppFull pro 2.0.3 verification
+# SetAppFull pro 2.0.5 verification
 
-Version: 2.0.3 / 203; package: `io.github.tianxing226.setappfullpro`.
+Version: 2.0.5 / 205; Android 11+; libxposed API 101 / 102.
 
-APK SHA-256: `CB99DC0FD9C5EFDDFD6EF3AF8748FA96393EA8D1E8BD79E6C661716A77587ED2`
+- Passed: 22 unit tests, release build, release lint, APK metadata checks, and release signature verification.
+- Checked: Bilibili portrait video detail page top layout and return to Home.
+- Unverified: the general FusionApp rule, VPN compatibility at runtime, and persistence across restarts. Instrumentation tests and a full app regression suite were not run for this release.
 
-## Passed
-
-- Release build, unit tests, and lint.
-- MuMu regression suite (22/22).
-- Xiaomi 22127RK46C, Android 17 / API 37: status and navigation bars hidden in Relief Map and Douyin.
-- Relief Map top strip fixed; map scale and touch behavior preserved.
-- Formal signing and in-place installation; version remains 2.0.3.
-
-## Limits
-
-- No separate Android 16 physical device was available, so Android 16 runtime is not marked passed.
-- A dedicated PopupWindow screenshot regression was not run on the physical device.
-- DRM, hardware-secure composition, and vendor-protected windows may still block screenshots.
+VPN compatibility handles common VPN status queries only in selected apps and is off by default. It does not change routing or handle proxy detection, TLS validation, or certificate pinning. Screenshots remain subject to DRM and hardware protection.
 
 [Back to usage](../README_EN.md)

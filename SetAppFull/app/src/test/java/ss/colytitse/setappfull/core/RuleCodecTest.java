@@ -15,6 +15,17 @@ public class RuleCodecTest {
         assertEquals(31, RuleCodec.withEnabled(16, true));
     }
 
+    @Test public void networkEnvironmentCompatibilityIsIndependentAndOptIn() {
+        assertEquals(32, RuleCodec.normalize(RuleCodec.COMPAT_NETWORK_ENVIRONMENT));
+        assertFalse(RuleCodec.isEnabled(RuleCodec.COMPAT_NETWORK_ENVIRONMENT));
+        assertEquals(32, RuleCodec.withEnabled(RuleCodec.COMPAT_NETWORK_ENVIRONMENT, false));
+        assertEquals(33, RuleCodec.withEnabled(RuleCodec.COMPAT_NETWORK_ENVIRONMENT, true));
+        assertEquals(15, RuleCodec.withEnabled(0, true));
+        assertEquals(1, RuleCodec.withEnabled(RuleCodec.COMPAT_NETWORK_ENVIRONMENT, true)
+                & RuleCodec.ENABLED);
+        assertEquals(47, RuleCodec.DEFAULT_ENABLED | RuleCodec.COMPAT_NETWORK_ENVIRONMENT);
+    }
+
     @Test public void wireFormatRejectsMalformedTypesAndKeys() {
         var decoded = RuleCodec.decode(Map.of(
                 "rule.com.valid", 255,
@@ -22,7 +33,7 @@ public class RuleCodecTest {
                 "rule.com.boolean", true,
                 "rule.bad/name", 15,
                 "unrelated", 15));
-        assertEquals(Map.of("com.valid", 31), decoded);
+        assertEquals(Map.of("com.valid", 63), decoded);
     }
 
     @Test public void migratesBothHistoricalAppKeysWithoutEnablingAllScope() {

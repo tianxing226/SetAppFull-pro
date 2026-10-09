@@ -1,21 +1,11 @@
-# SetAppFull pro 2.0.3 验证说明
+# SetAppFull pro 2.0.5 验证说明
 
-版本：2.0.3 / 203；包名：`io.github.tianxing226.setappfullpro`。
+版本：2.0.5 / 205；Android 11+；libxposed API 101 / 102。
 
-APK SHA-256：`CB99DC0FD9C5EFDDFD6EF3AF8748FA96393EA8D1E8BD79E6C661716A77587ED2`
+- 已通过：22 项单元测试、Release 构建、Release lint、APK 元数据与正式签名校验。
+- 已检查：哔哩哔哩竖屏视频详情页顶部显示及返回主页。
+- 未验证：FusionApp 通用规则、VPN 兼容运行效果及重启持久化；本版未运行仪器测试和完整应用回归。
 
-## 已通过
-
-- Release 构建、单元测试和 lint。
-- MuMu 回归测试（22/22）。
-- 小米 22127RK46C，Android 17 / API 37：Relief Map 和抖音状态栏、导航栏隐藏正常。
-- Relief Map 顶部白边修复，地图比例和交互保持正常。
-- 正式签名和覆盖安装；版本号仍为 2.0.3。
-
-## 限制
-
-- 没有 Android 16 独立实体设备，未声明 Android 16 运行时通过。
-- PopupWindow 专用场景未单独完成真机截图回归。
-- DRM、硬件安全合成和厂商安全窗口仍可能禁止截屏。
+VPN 兼容仅处理所选应用的常见 VPN 状态查询，默认关闭；不改变网络路由，不处理代理检测、TLS 校验或证书固定。截屏功能仍受 DRM 和硬件保护限制。
 
 [返回使用说明](../README.md)

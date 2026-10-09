@@ -170,7 +170,8 @@ class AppRepository(private val app: Application) {
 
     fun setOption(packageName: String, option: Int, enabled: Boolean) = enqueue {
         require(option == RuleCodec.HIDE_STATUS || option == RuleCodec.HIDE_NAVIGATION ||
-            option == RuleCodec.ALLOW_CUTOUT || option == RuleCodec.ALLOW_SCREENSHOT)
+            option == RuleCodec.ALLOW_CUTOUT || option == RuleCodec.ALLOW_SCREENSHOT ||
+            option == RuleCodec.COMPAT_NETWORK_ENVIRONMENT)
         // Read inside the queue: different switches may be tapped before UI state catches up.
         val previous = local.getInt(PREFIX + packageName, 0)
         writeRule(packageName, if (enabled) previous or option else previous and option.inv())

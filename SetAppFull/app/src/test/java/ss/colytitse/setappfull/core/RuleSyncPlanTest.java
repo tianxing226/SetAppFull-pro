@@ -43,6 +43,17 @@ public class RuleSyncPlanTest {
         assertTrue(plan.getRemoteWrites().isEmpty());
     }
 
+    @Test public void networkEnvironmentOptInSurvivesLocalAndRemoteSync() {
+        int rule = RuleCodec.COMPAT_NETWORK_ENVIRONMENT | RuleCodec.DEFAULT_ENABLED;
+        var plan = RuleSyncPlan.create(Map.of("rule.com.app", rule,
+                        "dirty.rule.com.app", true), Map.of(), false);
+        assertEquals(rule, (int) plan.getRemoteWrites().get("rule.com.app"));
+
+        var synchronizedPlan = RuleSyncPlan.create(Map.of("rule.com.app", rule),
+                Map.of("rule.com.app", rule), false);
+        assertEquals(rule, (int) synchronizedPlan.getLocalValues().get("rule.com.app"));
+    }
+
     @Test public void failedCommitMustBeRetriedEvenWhenRemoteObjectCacheAlreadyChanged() {
         // libxposed RemotePreferences updates its local map before its binder commit can fail.
         var plan = RuleSyncPlan.create(Map.of("rule.com.app", 0, "dirty.rule.com.app", true),

@@ -35,4 +35,5 @@ data class AppRow(
 ) {
     val enabled: Boolean get() = flags and RuleCodec.ENABLED != 0
     val allowScreenshot: Boolean get() = flags and RuleCodec.ALLOW_SCREENSHOT != 0
+    val networkEnvironmentCompat: Boolean get() = flags and RuleCodec.COMPAT_NETWORK_ENVIRONMENT != 0
 }

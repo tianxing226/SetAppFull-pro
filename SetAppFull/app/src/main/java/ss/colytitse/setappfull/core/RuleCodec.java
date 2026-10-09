@@ -17,8 +17,10 @@ public final class RuleCodec {
     public static final int ALLOW_CUTOUT = 1 << 3;
     /** Explicit per-app opt-in for clearing FLAG_SECURE. Kept outside ENABLED semantics. */
     public static final int ALLOW_SCREENSHOT = 1 << 4;
+    /** Explicit per-app opt-in for scoped network-environment compatibility. */
+    public static final int COMPAT_NETWORK_ENVIRONMENT = 1 << 5;
     public static final int DEFAULT_ENABLED = ENABLED | HIDE_STATUS | HIDE_NAVIGATION | ALLOW_CUTOUT;
-    public static final int ALL_FLAGS = DEFAULT_ENABLED | ALLOW_SCREENSHOT;
+    public static final int ALL_FLAGS = DEFAULT_ENABLED | ALLOW_SCREENSHOT | COMPAT_NETWORK_ENVIRONMENT;
     private static final Pattern PACKAGE = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+");
 
     private RuleCodec() {}

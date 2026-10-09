@@ -9,11 +9,14 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.view.ViewGroup;
+import android.webkit.WebView;
 
 import java.lang.ref.WeakReference;
 
 import ss.colytitse.setappfull.core.RuleCodec;
 import ss.colytitse.setappfull.core.WindowPolicy;
+import ss.colytitse.setappfull.core.WindowCompatibilityPolicy;
 
 /** All access is on the target application's main thread. No strong Activity/Window references. */
 final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
@@ -44,6 +47,14 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
     private int originalNavigationBarColor;
     private int originalSystemUiVisibility;
     private boolean reliefEdgeToEdge;
+    private boolean scopedEdgeBaselineCaptured;
+    private int scopedOriginalStatusBarColor;
+    private int scopedOriginalNavigationBarColor;
+    private int scopedOriginalSystemUiVisibility;
+    private boolean scopedEdgeToEdge;
+    // Window decor fitting defaults to true; explicit target requests are captured by the
+    // public setDecorFitsSystemWindows hook.
+    private boolean requestedDecorFitsSystemWindows = true;
     private boolean detached;
     private boolean applyQueued;
     private final Runnable applyRunnable = () -> {
@@ -156,6 +167,27 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
 
     void observeBehaviorRequest(int behavior) {
         originalBarBehavior = behavior;
+    }
+
+    void observeDecorFitsRequest(boolean decorFits) {
+        requestedDecorFitsSystemWindows = decorFits;
+    }
+
+    void observeSystemUiVisibilityRequest(int requested) {
+        if (!scopedEdgeToEdge) return;
+        int layoutFlags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+        scopedOriginalSystemUiVisibility = (scopedOriginalSystemUiVisibility & ~layoutFlags)
+                | (requested & layoutFlags);
+    }
+
+    void observeStatusBarColorRequest(int color) {
+        if (scopedEdgeToEdge) scopedOriginalStatusBarColor = color;
+    }
+
+    void observeNavigationBarColorRequest(int color) {
+        if (scopedEdgeToEdge) scopedOriginalNavigationBarColor = color;
     }
 
     void observeFlagsRequest(int flags, int mask) {
@@ -298,6 +330,7 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
         cutoutControlled = allowCutout;
 
         applyReliefCompatibility(window, effective);
+        applyScopedEdgeToEdgeCompatibility(window, effective);
         // The Relief compatibility path updates legacy decor flags after the modern controller;
         // issue one final hide so Android's insets state and the legacy state converge.
         if (hideTypes != 0) controller.hide(hideTypes);
@@ -384,6 +417,81 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
             decor.setSystemUiVisibility(originalSystemUiVisibility);
             reliefEdgeToEdge = false;
         }
+    }
+
+    /**
+     * Some legacy WebView wrappers and the Bilibili player activity hide the bars but still fit
+     * their content below the cutout inset. Keep this correction limited to recognizable windows;
+     * ordinary WebView apps and Bilibili's home activity retain their own layout policy.
+     */
+    private void applyScopedEdgeToEdgeCompatibility(Window window, int effective) {
+        Activity activity = activityReference.get();
+        if (activity == null) return;
+        String activityName = activity.getClass().getName();
+        boolean fusionWebApp = WindowCompatibilityPolicy.isFusionWebActivity(packageName, activityName)
+                && containsWebView(window.getDecorView());
+        boolean bilibiliPlayer = WindowCompatibilityPolicy.isBilibiliPlayer(packageName, activityName);
+        int configured = module.ruleFor(packageName);
+        boolean enabled = RuleCodec.isEnabled(configured)
+                && (effective & (RuleCodec.HIDE_STATUS | RuleCodec.HIDE_NAVIGATION | RuleCodec.ALLOW_CUTOUT)) != 0;
+        WindowInsets rootInsets = window.getDecorView().getRootWindowInsets();
+        boolean hasTopInset = bilibiliPlayer
+                && (scopedEdgeToEdge || contentStartsBelowStatusInset(window, rootInsets));
+        boolean matched = (fusionWebApp || (bilibiliPlayer && hasTopInset)) && enabled;
+        View decor = window.getDecorView();
+        if (matched && !scopedEdgeToEdge) {
+            scopedOriginalStatusBarColor = window.getStatusBarColor();
+            scopedOriginalNavigationBarColor = window.getNavigationBarColor();
+            scopedOriginalSystemUiVisibility = decor.getSystemUiVisibility();
+            scopedEdgeBaselineCaptured = true;
+        }
+        if (matched) {
+            window.setStatusBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(Color.TRANSPARENT);
+            if (requestedDecorFitsSystemWindows) window.setDecorFitsSystemWindows(false);
+            int desired = decor.getSystemUiVisibility()
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            if ((effective & RuleCodec.HIDE_STATUS) != 0) desired |= View.SYSTEM_UI_FLAG_FULLSCREEN;
+            if ((effective & RuleCodec.HIDE_NAVIGATION) != 0) {
+                desired |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+            }
+            if (decor.getSystemUiVisibility() != desired) decor.setSystemUiVisibility(desired);
+            scopedEdgeToEdge = true;
+        } else if (scopedEdgeToEdge && scopedEdgeBaselineCaptured) {
+            window.setStatusBarColor(scopedOriginalStatusBarColor);
+            window.setNavigationBarColor(scopedOriginalNavigationBarColor);
+            window.setDecorFitsSystemWindows(requestedDecorFitsSystemWindows);
+            int layoutFlags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            int current = decor.getSystemUiVisibility();
+            int restored = (current & ~layoutFlags) | (scopedOriginalSystemUiVisibility & layoutFlags);
+            if (restored != current) decor.setSystemUiVisibility(restored);
+            scopedEdgeToEdge = false;
+            scopedEdgeBaselineCaptured = false;
+        }
+    }
+
+    private static boolean contentStartsBelowStatusInset(Window window, WindowInsets insets) {
+        if (insets == null) return false;
+        int topInset = insets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top;
+        View content = window.findViewById(android.R.id.content);
+        if (content == null || topInset <= 0) return false;
+        int[] location = new int[2];
+        content.getLocationOnScreen(location);
+        return location[1] >= topInset;
+    }
+
+    private static boolean containsWebView(View view) {
+        if (view instanceof WebView) return true;
+        if (!(view instanceof ViewGroup)) return false;
+        ViewGroup group = (ViewGroup) view;
+        for (int index = 0; index < group.getChildCount(); index++) {
+            if (containsWebView(group.getChildAt(index))) return true;
+        }
+        return false;
     }
 
     @Override public void onGlobalLayout() { apply(false); }

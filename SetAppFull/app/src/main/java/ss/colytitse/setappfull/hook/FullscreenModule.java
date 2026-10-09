@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.app.Instrumentation;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -29,6 +31,7 @@ import java.util.WeakHashMap;
 import io.github.libxposed.api.XposedModule;
 import ss.colytitse.setappfull.BuildConfig;
 import ss.colytitse.setappfull.core.RuleCodec;
+import ss.colytitse.setappfull.core.NetworkEnvironmentCompatibility;
 
 /** API 101 baseline; API 102 runs the same public API without opting into hot reload. */
 public final class FullscreenModule extends XposedModule {
@@ -46,6 +49,7 @@ public final class FullscreenModule extends XposedModule {
     private boolean systemServer;
     private boolean hooksInstalled;
     private int errorCount;
+    private volatile String targetPackageName;
 
     @Override public void onModuleLoaded(ModuleLoadedParam param) {
         systemServer = param.isSystemServer();
@@ -75,10 +79,13 @@ public final class FullscreenModule extends XposedModule {
 
     @Override public void onPackageReady(PackageReadyParam param) {
         if (main == null && Looper.getMainLooper() != null) main = new Handler(Looper.getMainLooper());
-        if (systemServer || main == null || remotePreferences == null || hooksInstalled
+        if (systemServer || main == null || remotePreferences == null
                 || "android".equals(param.getPackageName())
                 || MODULE_PACKAGE.equals(param.getPackageName())) return;
+        targetPackageName = param.getPackageName();
+        if (hooksInstalled) return;
         hooksInstalled = true;
+        installNetworkEnvironmentHooks();
         installHook(Instrumentation.class, "callActivityOnResume", new Class<?>[]{Activity.class}, chain -> {
             Object result = chain.proceed();
             Activity activity = (Activity) chain.getArg(0);
@@ -122,7 +129,32 @@ public final class FullscreenModule extends XposedModule {
             Object result = chain.proceed();
             if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
                 WindowSession session = sessionFor((Window) chain.getThisObject());
-                if (session != null) session.scheduleApply();
+                if (session != null) {
+                    session.observeDecorFitsRequest((Boolean) chain.getArg(0));
+                    session.scheduleApply();
+                }
+            }
+            return result;
+        });
+        installHook(Window.class, "setStatusBarColor", new Class<?>[]{int.class}, chain -> {
+            Object result = chain.proceed();
+            if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
+                WindowSession session = sessionFor((Window) chain.getThisObject());
+                if (session != null) {
+                    session.observeStatusBarColorRequest((Integer) chain.getArg(0));
+                    session.scheduleApply();
+                }
+            }
+            return result;
+        });
+        installHook(Window.class, "setNavigationBarColor", new Class<?>[]{int.class}, chain -> {
+            Object result = chain.proceed();
+            if (!moduleMutation.get() && Looper.myLooper() == Looper.getMainLooper()) {
+                WindowSession session = sessionFor((Window) chain.getThisObject());
+                if (session != null) {
+                    session.observeNavigationBarColorRequest((Integer) chain.getArg(0));
+                    session.scheduleApply();
+                }
             }
             return result;
         });
@@ -176,6 +208,7 @@ public final class FullscreenModule extends XposedModule {
             View view = (View) chain.getThisObject();
             WindowSession session = sessionForView(view);
             int requested = (Integer) chain.getArg(0);
+            if (session != null) session.observeSystemUiVisibilityRequest(requested);
             int corrected = session == null ? requested : session.enforceSystemUiVisibility(requested);
             Object result = corrected == requested
                     ? chain.proceed()
@@ -216,6 +249,36 @@ public final class FullscreenModule extends XposedModule {
             if (window != null) destroyWindow(window);
             return result;
         });
+    }
+
+    private void installNetworkEnvironmentHooks() {
+        installHook(NetworkCapabilities.class, "hasTransport", new Class<?>[]{int.class}, chain -> {
+            if (networkEnvironmentEnabled()
+                    && NetworkEnvironmentCompatibility.isVpnTransport((Integer) chain.getArg(0))) {
+                return false;
+            }
+            return chain.proceed();
+        });
+        installHook(NetworkCapabilities.class, "hasCapability", new Class<?>[]{int.class}, chain -> {
+            if (networkEnvironmentEnabled()
+                    && NetworkEnvironmentCompatibility.isNotVpnCapability((Integer) chain.getArg(0))) {
+                return true;
+            }
+            return chain.proceed();
+        });
+        installHook(ConnectivityManager.class, "getNetworkInfo", new Class<?>[]{int.class}, chain -> {
+            if (networkEnvironmentEnabled()
+                    && NetworkEnvironmentCompatibility.isVpnNetworkType((Integer) chain.getArg(0))) {
+                return null;
+            }
+            return chain.proceed();
+        });
+    }
+
+    private boolean networkEnvironmentEnabled() {
+        String packageName = targetPackageName;
+        return packageName != null
+                && (ruleFor(packageName) & RuleCodec.COMPAT_NETWORK_ENVIRONMENT) != 0;
     }
 
     private void refreshRules() {
