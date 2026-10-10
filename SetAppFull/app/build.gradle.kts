@@ -18,7 +18,9 @@ abstract class GenerateBuildInfo : DefaultTask() {
     }
 }
 
-val workspaceRoot = providers.environmentVariable("SETAPPFULL_ROOT").orElse("F:/SetAppFull").get()
+val workspaceRoot = providers.environmentVariable("SETAPPFULL_ROOT").orElse(
+    rootProject.projectDir.parentFile.parentFile.absolutePath
+).get()
 val releasePropertiesFile = file("$workspaceRoot/signing/release.properties")
 val releaseProperties = Properties().apply {
     if (releasePropertiesFile.isFile) releasePropertiesFile.inputStream().use(::load)

@@ -4,7 +4,7 @@
 
 An Android module for **immersive fullscreen per app**, with separate controls for the status bar, navigation bar, and display cutout. Supports modern LSPosed / libxposed APIs 101 and 102.
 
-**[Download the release APK](https://github.com/tianxing226/SetAppFull-pro/releases/latest)** · [Telegram channel](https://t.me/tiaxcj) · [Verification notes](docs/VERIFICATION_EN.md)
+**[Download the release APK](https://github.com/tianxing226/SetAppFull-pro/releases/latest)** · [Telegram channel](https://t.me/tiaxcj) · [Compatibility notes](docs/VERIFICATION_EN.md)
 
 This is an independently maintained fork of [cokkeijigen/SetAppFull](https://github.com/cokkeijigen/SetAppFull), not a release published by the original author.
 
@@ -56,20 +56,9 @@ The package name is `io.github.tianxing226.setappfullpro`. Versions 2.0.2 and la
 
 Fullscreen policies pause in multi-window, picture-in-picture, and floating windows. Navigation bar control is released when the keyboard appears. App-drawn black bars and security restrictions may remain.
 
-The Bilibili adjustment is restricted to `tv.danmaku.bili`. The new Story player adapter recognizes version codes `9130500` and `9140400` in portrait fullscreen, with fullscreen, hidden status bar, and cutout access enabled. Unknown versions retain their original player behavior. Disable “哔哩哔哩播放页优化” (Bilibili playback optimization) in the app's rule details to opt out. The adapter retains the player's native aspect-ratio policy without forced stretching; native cropping, aspect-ratio letterboxing and encoded borders may remain. See the verification notes for the 9.14.0 MuMu startup limitation.
+The Bilibili adjustment is restricted to `tv.danmaku.bili`. The new Story player adapter recognizes version codes `9130500` and `9140400` in portrait fullscreen, with fullscreen, hidden status bar, and cutout access enabled. Unknown versions retain their original player behavior. Disable “哔哩哔哩播放页优化” (Bilibili playback optimization) in the app's rule details to opt out. The adapter retains the player's native aspect-ratio policy without forced stretching; native cropping, aspect-ratio letterboxing and encoded borders may remain. Version 9.14.0 may have startup issues in some environments and is not guaranteed compatible.
 
-See the [verification notes](docs/VERIFICATION_EN.md) for the devices, frameworks, and app versions actually tested, including unverified cases. Implemented functionality does not imply that every environment has passed acceptance testing.
-
-## Build from source
-
-Place the source in `F:\SetAppFull\source`, then run PowerShell from that directory:
-
-```powershell
-.\scripts\setup-toolchain.ps1
-.\scripts\build.ps1 -Tasks ':app:testDebugUnitTest', ':app:lintRelease', ':app:assembleRelease'
-```
-
-The scripts keep tools, caches, temporary files, logs, and build output under `F:\SetAppFull`. Release builds require `F:\SetAppFull\signing\release.properties` and the matching release key; upgrades must keep the same signature. The APK is written to `F:\SetAppFull\build\app\outputs\apk\release`. For local debugging, run `.\scripts\build.ps1` without arguments. Debug testing does not replace acceptance testing of the release APK.
+See the [compatibility notes](docs/VERIFICATION_EN.md) for limitations.
 
 ## Source and credits
 

@@ -2,7 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
-val workspaceRoot = providers.environmentVariable("SETAPPFULL_ROOT").orElse("F:/SetAppFull").get()
+val workspaceRoot = providers.environmentVariable("SETAPPFULL_ROOT").orElse(
+    rootProject.projectDir.parentFile.parentFile.absolutePath
+).get()
 android {
     namespace = "ss.colytitse.setappfull.probe"
     compileSdk = 37

@@ -8,7 +8,9 @@ plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.compose) apply false
 }
-val workspaceRoot = providers.environmentVariable("SETAPPFULL_ROOT").orElse("F:/SetAppFull")
+val workspaceRoot = providers.environmentVariable("SETAPPFULL_ROOT").orElse(
+    rootProject.projectDir.parentFile.parentFile.absolutePath
+)
 allprojects {
     layout.buildDirectory.set(file("${workspaceRoot.get()}/build/${if (path == ":") "root" else path.removePrefix(":").replace(':', '/')}"))
 }

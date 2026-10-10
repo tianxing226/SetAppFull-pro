@@ -4,7 +4,7 @@
 
 按应用设置**沉浸式全屏**的 Android 模块，独立控制状态栏、导航栏和挖孔区域。支持现代 LSPosed / libxposed API 101、102。
 
-**[下载正式版 APK](https://github.com/tianxing226/SetAppFull-pro/releases/latest)** · [Telegram 频道](https://t.me/tiaxcj) · [验证说明](docs/VERIFICATION.md)
+**[下载正式版 APK](https://github.com/tianxing226/SetAppFull-pro/releases/latest)** · [Telegram 频道](https://t.me/tiaxcj) · [兼容说明](docs/VERIFICATION.md)
 
 本项目是 [cokkeijigen/SetAppFull](https://github.com/cokkeijigen/SetAppFull) 的独立维护分支，不是原作者发布的版本。
 
@@ -56,20 +56,9 @@
 
 多窗口、画中画和浮动窗口会暂停全屏策略，输入法出现时释放导航栏控制。应用自身绘制的黑边和安全限制不保证消除。
 
-哔哩哔哩专项处理仅针对 `tv.danmaku.bili`。新增的 Story 播放器适配限于版本代码 `9130500`、`9140400` 的竖屏全屏场景，需开启全屏、隐藏状态栏和延伸至挖孔区域；未知版本保留原播放器行为。可在应用详情中关闭“哔哩哔哩播放页优化”。适配保持播放器原有比例策略，不强制拉伸；播放器原生裁切、宽高比留边及视频内嵌黑边仍可能存在。9.14.0 的 MuMu 启动限制见验证说明。
+哔哩哔哩专项处理仅针对 `tv.danmaku.bili`。新增的 Story 播放器适配限于版本代码 `9130500`、`9140400` 的竖屏全屏场景，需开启全屏、隐藏状态栏和延伸至挖孔区域；未知版本保留原播放器行为。可在应用详情中关闭“哔哩哔哩播放页优化”。适配保持播放器原有比例策略，不强制拉伸；播放器原生裁切、宽高比留边及视频内嵌黑边仍可能存在。9.14.0 在部分环境中可能出现启动问题，暂不保证兼容。
 
-不同设备、框架和应用版本的实际测试范围、未验证项见 [验证说明](docs/VERIFICATION.md)，功能已实现不代表所有环境均已通过验收。
-
-## 从源码构建
-
-将源码放在 `F:\SetAppFull\source`，在该目录运行 PowerShell：
-
-```powershell
-.\scripts\setup-toolchain.ps1
-.\scripts\build.ps1 -Tasks ':app:testDebugUnitTest', ':app:lintRelease', ':app:assembleRelease'
-```
-
-脚本把工具、缓存、临时文件、日志和构建输出集中到 `F:\SetAppFull`。Release 构建需要 `F:\SetAppFull\signing\release.properties` 及对应发布密钥；覆盖升级必须使用相同签名。APK 输出在 `F:\SetAppFull\build\app\outputs\apk\release`。仅本地调试可运行 `.\scripts\build.ps1`，调试包不替代正式包验收。
+详细限制见[兼容说明](docs/VERIFICATION.md)。
 
 ## 源码与致谢
 
