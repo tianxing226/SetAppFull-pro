@@ -25,10 +25,22 @@ public final class RuleSyncPlan {
 
     public static RuleSyncPlan create(Map<String, ?> localAll, Map<String, ?> remoteAll,
                                        boolean pendingReset) {
+        return create(localAll, remoteAll, pendingReset, Collections.emptySet());
+    }
+
+    public static RuleSyncPlan create(Map<String, ?> localAll, Map<String, ?> remoteAll,
+                                       boolean pendingReset, Set<String> scope) {
         Map<String, Integer> local = validRules(localAll);
         Map<String, Integer> remote = validRules(remoteAll);
         Set<String> keys = new LinkedHashSet<>(local.keySet());
         keys.addAll(remote.keySet());
+        if (pendingReset) {
+            // Scoped defaults have no stored key yet. Reset must turn them into explicit off
+            // records too, including scopes discovered after an offline reset.
+            for (String packageName : scope) {
+                if (RuleCodec.validPackage(packageName)) keys.add(RuleCodec.key(packageName));
+            }
+        }
         Map<String, Integer> result = new LinkedHashMap<>();
         Map<String, Integer> writes = new LinkedHashMap<>();
         Set<String> acknowledged = new LinkedHashSet<>();
@@ -64,7 +76,7 @@ public final class RuleSyncPlan {
 
     private static Map<String, Integer> validRules(Map<String, ?> values) {
         Map<String, Integer> result = new LinkedHashMap<>();
-        RuleCodec.decode(values).forEach((packageName, flags) -> result.put(RuleCodec.key(packageName), flags));
+        RuleCodec.decodeForScope(values).forEach((packageName, flags) -> result.put(RuleCodec.key(packageName), flags));
         return result;
     }
 }

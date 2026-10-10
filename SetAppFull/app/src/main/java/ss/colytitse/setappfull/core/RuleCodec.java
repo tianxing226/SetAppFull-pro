@@ -19,8 +19,11 @@ public final class RuleCodec {
     public static final int ALLOW_SCREENSHOT = 1 << 4;
     /** Explicit per-app opt-in for scoped network-environment compatibility. */
     public static final int COMPAT_NETWORK_ENVIRONMENT = 1 << 5;
+    /** Explicit per-app opt-out for the Bilibili-only fullscreen correction. */
+    public static final int DISABLE_BILIBILI_OPTIMIZATION = 1 << 6;
     public static final int DEFAULT_ENABLED = ENABLED | HIDE_STATUS | HIDE_NAVIGATION | ALLOW_CUTOUT;
-    public static final int ALL_FLAGS = DEFAULT_ENABLED | ALLOW_SCREENSHOT | COMPAT_NETWORK_ENVIRONMENT;
+    public static final int ALL_FLAGS = DEFAULT_ENABLED | ALLOW_SCREENSHOT | COMPAT_NETWORK_ENVIRONMENT
+            | DISABLE_BILIBILI_OPTIMIZATION;
     private static final Pattern PACKAGE = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+");
 
     private RuleCodec() {}
@@ -42,13 +45,45 @@ public final class RuleCodec {
         return (flags & ENABLED) != 0;
     }
 
+    /** A default is allowed only for a package whose scope/injection was actually confirmed. */
+    public static int resolveScopedRule(Map<String, Integer> rules, String packageName,
+                                        boolean scoped, boolean snapshotAvailable) {
+        if (!snapshotAvailable || !validPackage(packageName)
+                || "com.android.systemui".equals(packageName)) return 0;
+        Integer explicit = rules.get(packageName);
+        if (explicit != null) return normalize(explicit);
+        return scoped ? DEFAULT_ENABLED : 0;
+    }
+
+    /** UI/editing intent only: preserve the last known scoped choice while disconnected. A cached
+     * choice does not prove current scope, module loading or visual effect. Hook code must use
+     * resolveScopedRule with actual injection instead. An authoritative removal overrides cache. */
+    public static int resolveDisplayRule(Map<String, Integer> rules, String packageName,
+                                        Boolean inScope, boolean lastKnownScope, boolean pendingReset) {
+        boolean selected = inScope == null ? lastKnownScope : inScope;
+        return resolveScopedRule(rules, packageName, selected && !pendingReset, true);
+    }
+
+    /** Preserve corrupt entries as explicit off, so they never fall through to scoped defaults. */
+    public static Map<String, Integer> decodeForScope(Map<String, ?> preferences) {
+        Map<String, Integer> rules = new LinkedHashMap<>(decode(preferences));
+        for (String key : preferences.keySet()) {
+            if (key != null && key.startsWith(KEY_PREFIX)) {
+                String packageName = key.substring(KEY_PREFIX.length());
+                if (validPackage(packageName)) rules.putIfAbsent(packageName, 0);
+            }
+        }
+        return Collections.unmodifiableMap(rules);
+    }
+
     /** Disabling preserves selected options. Enabling a new, all-zero rule uses the default. */
     public static int withEnabled(int flags, boolean enabled) {
         int normalized = normalize(flags);
         if (!enabled) return normalized & ~ENABLED;
         int geometry = HIDE_STATUS | HIDE_NAVIGATION | ALLOW_CUTOUT;
-        boolean screenshotOnly = (normalized & ALLOW_SCREENSHOT) != 0 && (normalized & geometry) == 0;
-        return (normalized == 0 || screenshotOnly) ? normalized | DEFAULT_ENABLED : normalized | ENABLED;
+        boolean independentOptionsOnly = (normalized & (ENABLED | geometry)) == 0;
+        return independentOptionsOnly
+                ? normalized | DEFAULT_ENABLED : normalized | ENABLED;
     }
 
     /** Invalid values fail closed; never coerce strings or booleans into enabled rules. */

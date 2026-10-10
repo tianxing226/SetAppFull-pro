@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
@@ -40,6 +41,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import ss.colytitse.setappfull.core.RuleCodec
 
 /**
  * UI contract tests with explicitly injected state. These do not connect to Xposed
@@ -146,6 +148,22 @@ class SetAppFullUiTest {
     }
 
     @Test
+    fun homeTutorialExplainsBothEntryPointsAndOpensAppSettings() {
+        val state = mutableStateOf(UiState(apps = listOf(alpha), loading = false))
+        compose.setContent { TestApp(state) }
+        scrollTo("tutorial_select", "home_page").assertIsDisplayed()
+        compose.onNodeWithText("在本应用开启全屏并按提示授权；或直接在框架作用域中勾选应用。")
+            .assertIsDisplayed()
+        scrollTo("tutorial_verify", "home_page").assertIsDisplayed()
+        compose.onNodeWithText("按提示重新启动目标应用，检查全屏显示。点击应用可调整独立规则。")
+            .assertIsDisplayed()
+        scrollTo("manage_apps", "home_page").performClick()
+        compose.onNodeWithTag("nav_1").assertIsSelected()
+        compose.onNodeWithTag("settings_page").assertIsDisplayed()
+        scrollTo("app_toggle_test.alpha").assertIsOff()
+    }
+
+    @Test
     fun navigationAndToggleRespectDefaultOffState() {
         val state = mutableStateOf(UiState(apps = listOf(alpha), loading = false))
         val toggles = mutableListOf<Pair<String, Boolean>>()
@@ -214,7 +232,49 @@ class SetAppFullUiTest {
             assertEquals(listOf("test.system.clock"), requests)
             assertEquals(false, state.value.apps.single().inScope)
         }
-        compose.onNodeWithText("此应用尚未加入框架作用域，开启规则后仍需授权。").assertExists()
+        compose.onNodeWithText("开启规则后会自动申请作用域授权；未完成时可重试或在框架中勾选。").assertExists()
+    }
+
+    @Test
+    fun pendingScopeRequestShowsStatusAndPreventsRepeatedRequests() {
+        val message = "等待授权：请确认框架通知中的作用域申请"
+        val state = mutableStateOf(UiState(apps = listOf(beta.copy(
+            scopeRequestPending = true, syncMessage = message)), loading = false))
+        val requests = mutableListOf<String>()
+        compose.setContent { TestApp(state, onScope = { requests += it }) }
+        compose.onNodeWithTag("nav_1").performClick()
+        scrollTo("app_row_test.beta").assertIsDisplayed()
+        compose.onNodeWithTag("app_sync_test.beta", useUnmergedTree = true).assertTextEquals(message)
+        compose.onNodeWithTag("app_row_test.beta").performClick()
+        compose.onNodeWithTag("request_scope").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("rule_sync_status").performScrollTo().assertTextEquals(message)
+        compose.runOnIdle { assertTrue(requests.isEmpty()) }
+    }
+
+    @Test
+    fun bilibiliOptimizationIsScopedToItsPackageAndCanBeDisabled() {
+        val bili = AppRow("tv.danmaku.bili", "哔哩哔哩", flags = RuleCodec.DEFAULT_ENABLED)
+        val state = mutableStateOf(UiState(apps = listOf(alpha, bili), loading = false))
+        val changes = mutableListOf<Triple<String, Int, Boolean>>()
+        compose.setContent {
+            TestApp(state, onRuleChange = { packageName, option, enabled ->
+                changes += Triple(packageName, option, enabled)
+                state.value = state.value.copy(apps = state.value.apps.map {
+                    if (it.packageName == packageName) it.copy(flags =
+                        if (enabled) it.flags or option else it.flags and option.inv()) else it
+                })
+            })
+        }
+        compose.onNodeWithTag("nav_1").performClick()
+        scrollTo("app_row_test.alpha").performClick()
+        compose.onNodeWithContentDescription("哔哩哔哩播放页优化").assertDoesNotExist()
+        compose.onNodeWithText("完成").performClick()
+        scrollTo("app_row_tv.danmaku.bili").performClick()
+        compose.onNodeWithContentDescription("哔哩哔哩播放页优化").performScrollTo()
+            .assertIsOn().performClick().assertIsOff()
+        compose.runOnIdle {
+            assertEquals(listOf(Triple("tv.danmaku.bili", RuleCodec.DISABLE_BILIBILI_OPTIMIZATION, true)), changes)
+        }
     }
 
     @Test
@@ -360,7 +420,22 @@ class SetAppFullUiTest {
     }
 
     @Test
-    fun darkThemeSuppliesReadableContentColorToTitlesAndTranslucentCards() {
+    fun landscapeLayoutKeepsTutorialAndSettingsReachableAboveNavigation() {
+        val state = mutableStateOf(UiState(apps = listOf(alpha, beta), loading = false))
+        compose.setContent {
+            Box(Modifier.width(720.dp).height(360.dp)) { TestApp(state) }
+        }
+        compose.onNodeWithTag("nav_0").assertIsDisplayed()
+        scrollTo("tutorial_verify", "home_page").assertIsDisplayed()
+        compose.onNodeWithTag("nav_1").assertIsDisplayed().performClick()
+        scrollTo("filter_1").performClick()
+        scrollTo("app_toggle_test.beta").assertIsDisplayed().assertIsOn()
+        scrollTo("reset_rules").assertIsDisplayed()
+        compose.onNodeWithTag("nav_0").assertIsDisplayed().performClick()
+    }
+
+    @Test
+    fun darkThemeSuppliesReadableContentColorToTitlesAndSolidCards() {
         val state = mutableStateOf(UiState(apps = listOf(alpha), loading = false))
         compose.setContent {
             val darkConfiguration = Configuration(LocalConfiguration.current).apply {

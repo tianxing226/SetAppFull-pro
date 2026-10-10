@@ -6,6 +6,8 @@ public final class WindowCompatibilityPolicy {
     private static final String BILIBILI_PACKAGE = "tv.danmaku.bili";
     private static final String BILIBILI_PLAYER_ACTIVITY =
             "com.bilibili.ship.theseus.detail.UnitedBizDetailsActivity";
+    private static final String BILIBILI_STORY_ACTIVITY =
+            "com.bilibili.video.story.StoryVideoActivity";
 
     private WindowCompatibilityPolicy() {}
 
@@ -19,6 +21,7 @@ public final class WindowCompatibilityPolicy {
 
     public static boolean isBilibiliPlayer(String packageName, String activityClassName) {
         return BILIBILI_PACKAGE.equals(packageName)
-                && BILIBILI_PLAYER_ACTIVITY.equals(activityClassName);
+                && (BILIBILI_PLAYER_ACTIVITY.equals(activityClassName)
+                || BILIBILI_STORY_ACTIVITY.equals(activityClassName));
     }
 }

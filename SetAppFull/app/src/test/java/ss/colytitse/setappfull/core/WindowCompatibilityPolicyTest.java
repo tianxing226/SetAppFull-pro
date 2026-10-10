@@ -20,8 +20,12 @@ public class WindowCompatibilityPolicyTest {
     @Test public void bilibiliCompatibilityIsLimitedToVerifiedPlayerActivity() {
         assertTrue(WindowCompatibilityPolicy.isBilibiliPlayer("tv.danmaku.bili",
                 "com.bilibili.ship.theseus.detail.UnitedBizDetailsActivity"));
+        assertTrue(WindowCompatibilityPolicy.isBilibiliPlayer("tv.danmaku.bili",
+                "com.bilibili.video.story.StoryVideoActivity"));
         assertFalse(WindowCompatibilityPolicy.isBilibiliPlayer("tv.danmaku.bili",
                 "tv.danmaku.bili.MainActivityV2"));
+        assertFalse(WindowCompatibilityPolicy.isBilibiliPlayer("tv.danmaku.bili",
+                "com.bilibili.video.story.StoryVideoActivity$Other"));
         assertFalse(WindowCompatibilityPolicy.isBilibiliPlayer("com.example.other",
                 "com.bilibili.ship.theseus.detail.UnitedBizDetailsActivity"));
     }

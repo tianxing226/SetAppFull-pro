@@ -8,13 +8,11 @@ An Android module for **immersive fullscreen per app**, with separate controls f
 
 This is an independently maintained fork of [cokkeijigen/SetAppFull](https://github.com/cokkeijigen/SetAppFull), not a release published by the original author.
 
-## 2.0.5 update
+## 2.0.6 update
 
-- Fixed the top black strip on Bilibili video detail pages.
-- Added window compatibility handling for FusionApp web apps, retaining the Relief Map rule.
-- Added per-app VPN detection compatibility, off by default.
-
-See the [2.0.5 release notes](RELEASE-2.0.5_EN.md).
+- **Two activation paths:** Selecting an unconfigured app in the framework scope prepares default immersive rules. Enabling fullscreen in this app automatically requests scope access.
+- **Solid-color interface:** Redesigned Home and Settings without gradients or glass effects, with a short guide on Home.
+- **Bilibili-specific adjustment:** Removes the system-bar space reserved inside the Story player in supported portrait fullscreen scenes, preserves the original video aspect ratio, and can be disabled per app.
 
 ## Features
 
@@ -44,11 +42,11 @@ See the [2.0.5 release notes](RELEASE-2.0.5_EN.md).
 Requires **Android 11 or later** and a modern LSPosed / libxposed-compatible framework (API 101 or 102).
 
 1. Install the APK and enable **SetAppFull pro** in your framework manager.
-2. Check the framework status on Home, then find the target app in Settings.
-3. Grant its scope and enable fullscreen, screenshots, or VPN detection compatibility as needed.
-4. Restart the target app to apply changes. Disable a feature and restart to restore its original behavior.
+2. Choose either path: enable the target app in Settings and confirm the framework authorization when prompted, or select the target app directly in the framework manager's scope.
+3. Scoped apps without saved rules default to hiding both system bars and allowing the display cutout area. Existing custom rules, explicit disables, and reset results take priority.
+4. Restart the target app when prompted and check the result. Tap an app to change individual options. Screenshot access and VPN detection compatibility remain manual opt-ins.
 
-If the app list is incomplete, check app-list access from Settings.
+Scope requests may require confirmation through a framework notification; the app cannot bypass framework authorization. Pending authorization, synchronized rules, and verified visual effects are separate states. Newly scoped apps usually need a restart; processes that have already loaded the module apply rule updates live where possible. If the app list is incomplete, check app-list access from Settings.
 
 ### Migrating from an older version
 
@@ -58,10 +56,23 @@ The package name is `io.github.tianxing226.setappfullpro`. Versions 2.0.2 and la
 
 Fullscreen policies pause in multi-window, picture-in-picture, and floating windows. Navigation bar control is released when the keyboard appears. App-drawn black bars and security restrictions may remain.
 
-Runtime behavior of the general FusionApp rule and VPN compatibility is not yet verified. See the [verification notes](docs/VERIFICATION_EN.md).
+The Bilibili adjustment is restricted to `tv.danmaku.bili`. The new Story player adapter supports version codes `9130500` and `9140400` in portrait fullscreen, with fullscreen, hidden status bar, and cutout access enabled. Unknown versions retain their original player behavior. Disable “哔哩哔哩播放页优化” (Bilibili playback optimization) in the app's rule details to opt out. The adapter neither stretches nor crops video; aspect-ratio letterboxing and black bars encoded in the video may remain.
+
+See the [verification notes](docs/VERIFICATION_EN.md) for the devices, frameworks, and app versions actually tested, including unverified cases. Implemented functionality does not imply that every environment has passed acceptance testing.
+
+## Build from source
+
+Place the source in `F:\SetAppFull\source`, then run PowerShell from that directory:
+
+```powershell
+.\scripts\setup-toolchain.ps1
+.\scripts\build.ps1 -Tasks ':app:testDebugUnitTest', ':app:lintRelease', ':app:assembleRelease'
+```
+
+The scripts keep tools, caches, temporary files, logs, and build output under `F:\SetAppFull`. Release builds require `F:\SetAppFull\signing\release.properties` and the matching release key; upgrades must keep the same signature. The APK is written to `F:\SetAppFull\build\app\outputs\apk\release`. For local debugging, run `.\scripts\build.ps1` without arguments. Debug testing does not replace acceptance testing of the release APK.
 
 ## Source and credits
 
 - [Maintained source](https://github.com/tianxing226/SetAppFull-pro) · [Module repository](https://github.com/Xposed-Modules-Repo/io.github.tianxing226.setappfullpro). Releases include the APK, full source, and SHA-256 checksums.
 - Upstream: [cokkeijigen/SetAppFull](https://github.com/cokkeijigen/SetAppFull), with attribution retained under [AGPL-3.0](LICENSE).
-- Liquid glass: [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) / Backdrop. See [third-party notices](THIRD_PARTY_NOTICES_EN.md) for other dependencies.
+- See [third-party notices](THIRD_PARTY_NOTICES_EN.md) for dependencies and historical attribution.

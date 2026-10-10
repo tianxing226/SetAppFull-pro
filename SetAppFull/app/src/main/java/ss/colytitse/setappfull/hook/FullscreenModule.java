@@ -42,6 +42,7 @@ public final class FullscreenModule extends XposedModule {
     private final Set<Method> observedMethods = new HashSet<>();
     private final ThreadLocal<Boolean> moduleMutation = ThreadLocal.withInitial(() -> false);
     private volatile Map<String, Integer> rules = Collections.emptyMap();
+    private volatile boolean ruleSnapshotAvailable;
     private SharedPreferences remotePreferences;
     // SharedPreferences may keep weak listener references; the module must retain this one.
     private SharedPreferences.OnSharedPreferenceChangeListener preferenceListener;
@@ -50,6 +51,7 @@ public final class FullscreenModule extends XposedModule {
     private boolean hooksInstalled;
     private int errorCount;
     private volatile String targetPackageName;
+    private BilibiliStoryViewport bilibiliViewport;
 
     @Override public void onModuleLoaded(ModuleLoadedParam param) {
         systemServer = param.isSystemServer();
@@ -81,10 +83,17 @@ public final class FullscreenModule extends XposedModule {
         if (main == null && Looper.getMainLooper() != null) main = new Handler(Looper.getMainLooper());
         if (systemServer || main == null || remotePreferences == null
                 || "android".equals(param.getPackageName())
+                || "com.android.systemui".equals(param.getPackageName())
                 || MODULE_PACKAGE.equals(param.getPackageName())) return;
         targetPackageName = param.getPackageName();
         if (hooksInstalled) return;
         hooksInstalled = true;
+        if (BilibiliStoryViewport.PACKAGE.equals(targetPackageName)) {
+            try { bilibiliViewport = new BilibiliStoryViewport(this, param.getClassLoader()); }
+            catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
+                reportFailure("Bilibili Story adapter unavailable; using standard window policy", failure);
+            }
+        }
         installNetworkEnvironmentHooks();
         installHook(Instrumentation.class, "callActivityOnResume", new Class<?>[]{Activity.class}, chain -> {
             Object result = chain.proceed();
@@ -284,13 +293,16 @@ public final class FullscreenModule extends XposedModule {
     private void refreshRules() {
         try {
             // IPC/disk access is confined to initialization and change notifications, never draw hooks.
-            rules = RuleCodec.decode(remotePreferences.getAll());
+            rules = RuleCodec.decodeForScope(remotePreferences.getAll());
+            ruleSnapshotAvailable = true;
         } catch (RuntimeException failure) {
+            ruleSnapshotAvailable = false;
             rules = Collections.emptyMap();
             reportFailure("Configuration refresh failed; restoring controlled windows", failure);
         }
         onMain(() -> {
             for (WindowSession session : new ArrayList<>(windows.values())) session.apply(true);
+            refreshBilibiliViewport();
         });
     }
 
@@ -376,7 +388,12 @@ public final class FullscreenModule extends XposedModule {
     }
 
     int ruleFor(String packageName) {
-        return rules.getOrDefault(packageName, 0);
+        if (MODULE_PACKAGE.equals(packageName) || "android".equals(packageName)
+                || "com.android.systemui".equals(packageName)) return 0;
+        // The framework only calls this module in selected target processes. Do not extend the
+        // fallback to an unrelated package that happens to share a context/window in that process.
+        return RuleCodec.resolveScopedRule(rules, packageName,
+                packageName.equals(targetPackageName), ruleSnapshotAvailable);
     }
 
     void mutate(Runnable action) {
@@ -420,7 +437,12 @@ public final class FullscreenModule extends XposedModule {
 
     private void installHook(Class<?> owner, String name, Class<?>[] parameters, Hooker hooker) {
         try {
-            hook(owner.getDeclaredMethod(name, parameters)).intercept(hooker);
+            Method method = owner.getDeclaredMethod(name, parameters);
+            if (Modifier.isAbstract(method.getModifiers()) && owner == Window.class) {
+                method = Class.forName("com.android.internal.policy.PhoneWindow")
+                        .getMethod(name, parameters);
+            }
+            hook(method).intercept(hooker);
         } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
             reportFailure("Cannot register " + owner.getName() + "." + name, failure);
         }
@@ -454,5 +476,20 @@ public final class FullscreenModule extends XposedModule {
                 + ", floating=" + floating;
         log(Log.INFO, TAG, message);
         Log.i(TAG, message);
+    }
+
+    void refreshBilibiliViewport() {
+        if (bilibiliViewport != null) bilibiliViewport.refresh();
+    }
+
+    void reportBilibiliPadding(int requested, int applied) {
+        String message = "Bilibili Story viewport top: " + requested + " -> " + applied;
+        log(Log.INFO, TAG, message);
+        Log.i(TAG, message);
+    }
+
+    void reportBilibiliAdapter() {
+        log(Log.INFO, TAG, "Bilibili Story adapter registered (2.0.6)");
+        Log.i(TAG, "Bilibili Story adapter registered (2.0.6)");
     }
 }

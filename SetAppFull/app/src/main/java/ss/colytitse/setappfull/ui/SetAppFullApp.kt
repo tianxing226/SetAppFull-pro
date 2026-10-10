@@ -4,7 +4,6 @@ import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,8 +29,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
@@ -50,35 +47,28 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.highlight.Highlight
 import ss.colytitse.setappfull.BuildConfig
 import ss.colytitse.setappfull.core.RuleCodec
 import ss.colytitse.setappfull.R
 import androidx.compose.material3.ripple
 
 private val LightPalette = lightColorScheme(
-    primary = Color(0xFF6554BE), onPrimary = Color.White,
-    primaryContainer = Color(0xFFECE6FF), onPrimaryContainer = Color(0xFF332467),
-    secondary = Color(0xFF557B72), secondaryContainer = Color(0xFFDFF0E9),
-    background = Color(0xFFF5F3F9), onBackground = Color(0xFF262332),
-    surface = Color(0xFFFFFCFF), onSurface = Color(0xFF262332),
-    surfaceVariant = Color(0xFFECE9F2), onSurfaceVariant = Color(0xFF777281),
-    outline = Color(0xFF9991A8), outlineVariant = Color(0xFFE1DBE9),
+    primary = Color(0xFF4B5C91), onPrimary = Color.White,
+    primaryContainer = Color(0xFFE8EDF9), onPrimaryContainer = Color(0xFF29385F),
+    secondary = Color(0xFF326953), secondaryContainer = Color(0xFFE2F0E8),
+    background = Color(0xFFF5F6F8), onBackground = Color(0xFF1D222C),
+    surface = Color.White, onSurface = Color(0xFF1D222C),
+    surfaceVariant = Color(0xFFECEFF3), onSurfaceVariant = Color(0xFF5F6572),
+    outline = Color(0xFF8A919E), outlineVariant = Color(0xFFDEE2EA),
 )
 private val DarkPalette = darkColorScheme(
-    primary = Color(0xFFC7B9FF), onPrimary = Color(0xFF302356),
-    primaryContainer = Color(0xFF3E315C), onPrimaryContainer = Color(0xFFECE5FF),
-    secondary = Color(0xFFA1D3C4), secondaryContainer = Color(0xFF24453D),
-    background = Color(0xFF15131D), onBackground = Color(0xFFF1EBF7),
-    surface = Color(0xFF24212D), onSurface = Color(0xFFF1EBF7),
-    surfaceVariant = Color(0xFF332E3E), onSurfaceVariant = Color(0xFFB5AEBF),
-    outline = Color(0xFF81778F), outlineVariant = Color(0xFF3E374B),
+    primary = Color(0xFFB6C5F4), onPrimary = Color(0xFF24335D),
+    primaryContainer = Color(0xFF303F65), onPrimaryContainer = Color(0xFFE3EAFD),
+    secondary = Color(0xFF9BD2B5), secondaryContainer = Color(0xFF254737),
+    background = Color(0xFF12151B), onBackground = Color(0xFFE9EDF4),
+    surface = Color(0xFF1D222B), onSurface = Color(0xFFE9EDF4),
+    surfaceVariant = Color(0xFF2B313D), onSurfaceVariant = Color(0xFFB2BAC8),
+    outline = Color(0xFF838D9D), outlineVariant = Color(0xFF343C49),
 )
 
 @Composable
@@ -115,34 +105,30 @@ fun SetAppFullApp(
                 onToggle(packageName, enabled)
             }
         }
-        val backdrop = rememberLayerBackdrop()
         val navigationHeight = (64 * LocalDensity.current.fontScale.coerceIn(1f, 1.55f)).dp
         Box(Modifier.fillMaxSize().imePadding().background(MaterialTheme.colorScheme.background).testTag("app_root")) {
-            Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
-                AmbientBackground(dark)
-                Column(
-                    Modifier.fillMaxSize()
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Column(Modifier.widthIn(max = 900.dp).fillMaxSize()) {
-                        Header(onRefresh)
-                        if (permissionRequestInProgress) {
-                            Text("需要读取已安装应用，才能选择要设置全屏的应用；请在系统权限窗口中选择。",
-                                Modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag("app_access_purpose"),
-                                style = MaterialTheme.typography.bodyMedium)
-                        }
-                        if (page == 0) {
-                            HomePage(state, { page = 1 }, onJoinCommunity, navigationHeight)
-                        } else {
-                            SettingsPage(state, guardedToggle, onShowSystem,
-                                { detailsPackage = it }, { resetDialog = true }, navigationHeight,
-                                onOpenAppSettings, onRefresh)
-                        }
+            Column(
+                Modifier.fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Column(Modifier.widthIn(max = 900.dp).fillMaxSize()) {
+                    Header(onRefresh)
+                    if (permissionRequestInProgress) {
+                        Text("需要读取已安装应用，才能选择要设置全屏的应用；请在系统权限窗口中选择。",
+                            Modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag("app_access_purpose"),
+                            style = MaterialTheme.typography.bodyMedium)
+                    }
+                    if (page == 0) {
+                        HomePage(state, { page = 1 }, onJoinCommunity, navigationHeight)
+                    } else {
+                        SettingsPage(state, guardedToggle, onShowSystem,
+                            { detailsPackage = it }, { resetDialog = true }, navigationHeight,
+                            onOpenAppSettings, onRefresh)
                     }
                 }
             }
-            GlassNavigation(page, { page = it }, backdrop, dark, navigationHeight,
+            SolidNavigation(page, { page = it }, navigationHeight,
                 Modifier.align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
                     .padding(horizontal = 28.dp, vertical = 16.dp))
@@ -221,24 +207,8 @@ fun SetAppFullApp(
 }
 
 @Composable
-private fun AmbientBackground(dark: Boolean) {
-    Canvas(Modifier.fillMaxSize()) {
-        val alpha = if (dark) 0.17f else 0.5f
-        drawCircle(Brush.radialGradient(listOf(Color(0xFFDBCEFF).copy(alpha), Color.Transparent),
-            Offset(size.width * 0.95f, size.height * 0.2f), size.width * 0.65f),
-            size.width * 0.65f, Offset(size.width * 0.95f, size.height * 0.2f))
-        drawCircle(Brush.radialGradient(listOf(Color(0xFFA5DCCD).copy(alpha), Color.Transparent),
-            Offset(size.width * 0.12f, size.height * 0.88f), size.width * 0.7f),
-            size.width * 0.7f, Offset(size.width * 0.12f, size.height * 0.88f))
-        drawCircle(Brush.radialGradient(listOf(Color(0xFFC1ABFF).copy(alpha), Color.Transparent),
-            Offset(size.width * 0.92f, size.height * 0.99f), size.width * 0.6f),
-            size.width * 0.6f, Offset(size.width * 0.92f, size.height * 0.99f))
-    }
-}
-
-@Composable
 private fun Header(onRefresh: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(start = 26.dp, end = 16.dp, top = 14.dp, bottom = 8.dp),
+    Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Image(painterResource(R.drawable.ic_pro_mark), null, Modifier.size(30.dp))
         Spacer(Modifier.width(10.dp))
@@ -262,23 +232,19 @@ private fun HomePage(state: UiState, onSettings: () -> Unit, onJoinCommunity: ()
         FrameworkStatus.UNSUPPORTED -> "框架暂不兼容"
     }
     LazyColumn(Modifier.fillMaxSize().testTag("home_page"),
-        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 18.dp,
-            bottom = navigationHeight + 64.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 16.dp,
+            bottom = navigationHeight + 64.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
-            Column(Modifier.padding(vertical = 10.dp)) {
-                Text("让视野，自由延伸", color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelLarge, letterSpacing = 1.sp)
-                Spacer(Modifier.height(14.dp))
-                Text("全屏，刚刚好。", fontSize = 34.sp, lineHeight = 44.sp, fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground)
-                Spacer(Modifier.height(10.dp))
-                Text("为每个应用，选择适合它的显示方式。", style = MaterialTheme.typography.bodyMedium,
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("全屏显示", modifier = Modifier.testTag("home_title"),
+                    style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("按应用设置，保留你习惯的显示方式。", style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         item {
-            Surface(shape = RoundedCornerShape(30.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)) {
-                Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(44.dp).background(
                             if (connected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
@@ -290,11 +256,12 @@ private fun HomePage(state: UiState, onSettings: () -> Unit, onJoinCommunity: ()
                         Column(Modifier.weight(1f)) {
                             Text(statusText, modifier = Modifier.testTag("framework_status"),
                                 style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text("模块连接状态", style = MaterialTheme.typography.labelMedium,
+                            Text(if (connected) "可以管理应用规则" else "请先启用模块并检查框架",
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     InfoLine("运行框架", state.frameworkName.ifBlank { "未获取" })
                     InfoLine("框架版本", state.frameworkVersion.ifBlank { "未获取" })
                     InfoLine("Xposed API", state.frameworkApi?.toString() ?: "未获取", "framework_api")
@@ -306,18 +273,15 @@ private fun HomePage(state: UiState, onSettings: () -> Unit, onJoinCommunity: ()
             }
         }
         item {
-            Surface(onClick = onSettings, shape = RoundedCornerShape(26.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)) {
-                Row(Modifier.fillMaxWidth().padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.Bottom) {
-                            Text(state.enabledCount.toString(), fontSize = 38.sp, fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer)
-                            Text("  个应用", Modifier.padding(bottom = 6.dp),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                style = MaterialTheme.typography.bodyMedium)
-                        }
-                        Text("已开启全屏规则", color = MaterialTheme.colorScheme.onPrimaryContainer,
+            Surface(onClick = onSettings, shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.testTag("manage_apps"), color = MaterialTheme.colorScheme.primaryContainer) {
+                Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(AppIcons.Expand, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("管理应用", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text("${state.enabledCount} 个应用已开启全屏规则", color = MaterialTheme.colorScheme.onPrimaryContainer,
                             style = MaterialTheme.typography.bodyMedium)
                     }
                     Icon(AppIcons.Arrow, "管理应用规则", tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -326,10 +290,23 @@ private fun HomePage(state: UiState, onSettings: () -> Unit, onJoinCommunity: ()
         }
         if (state.error != null) item { MessageCard(state.error, true) }
         item {
+            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+                Column(Modifier.fillMaxWidth().padding(20.dp).testTag("quick_start"),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("快速开始", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    TutorialStep("1", "启用模块", "在框架管理器中启用 SetAppFull pro。", "tutorial_enable")
+                    TutorialStep("2", "选择应用", "在本应用开启全屏并按提示授权；或直接在框架作用域中勾选应用。", "tutorial_select")
+                    TutorialStep("3", "查看效果", "按提示重新启动目标应用，检查全屏显示。点击应用可调整独立规则。", "tutorial_verify")
+                    Text("服务连接成功不代表每个目标应用已加载模块。",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        item {
             OutlinedButton(onClick = onJoinCommunity,
                 modifier = Modifier.fillMaxWidth().testTag("join_community"),
-                shape = RoundedCornerShape(24.dp),
-                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 18.dp)) {
+                shape = RoundedCornerShape(20.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)) {
                 Icon(AppIcons.Link, null)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -341,21 +318,26 @@ private fun HomePage(state: UiState, onSettings: () -> Unit, onJoinCommunity: ()
             }
         }
         item {
-            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)) {
-                Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     InfoLine("模块版本", BuildConfig.VERSION_NAME, "module_version")
                     InfoLine("Android 版本", "${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}", "android_version")
                 }
             }
         }
-        item {
-            Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("让规则真正生效", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Text("在设置中开启应用规则，并将应用加入框架作用域。按提示重启目标应用后检查显示效果。",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("服务连接成功不代表每个目标应用已加载模块。",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+    }
+}
+
+@Composable
+private fun TutorialStep(number: String, title: String, description: String, tag: String) {
+    Row(Modifier.fillMaxWidth().testTag(tag), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(28.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+            contentAlignment = Alignment.Center) {
+            Text(number, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -391,9 +373,9 @@ private fun SettingsPage(
         contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 10.dp,
             bottom = navigationHeight + 64.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            Text("应用设置", Modifier.padding(bottom = 5.dp).testTag("settings_title"), style = MaterialTheme.typography.headlineLarge,
+            Text("应用设置", Modifier.padding(bottom = 6.dp).testTag("settings_title"), style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold)
-            Text("每个应用，都有自己的全屏方式。", style = MaterialTheme.typography.bodyMedium,
+            Text("开启全屏，按提示授权。点击应用调整独立规则。", style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (state.appListAccess == AppListAccess.DENIED || state.appListAccess == AppListAccess.ERROR) item {
@@ -405,10 +387,10 @@ private fun SettingsPage(
                 trailingIcon = if (query.isNotEmpty()) {
                     { IconButton(onClick = { query = "" }) { Icon(AppIcons.Close, "清空搜索") } }
                 } else null,
-                shape = RoundedCornerShape(20.dp), singleLine = true,
+                shape = RoundedCornerShape(16.dp), singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)))
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface))
         }
         item {
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -417,12 +399,18 @@ private fun SettingsPage(
                         modifier = Modifier.testTag("filter_$index"))
                 }
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("显示系统应用", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Switch(state.showSystem, onShowSystem, modifier = Modifier.testTag("show_system")
-                    .semantics { contentDescription = "显示系统应用" })
+            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text("显示系统应用", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Switch(state.showSystem, onShowSystem, modifier = Modifier.testTag("show_system")
+                        .semantics { contentDescription = "显示系统应用" })
+                }
             }
+        }
+        item {
+            Text("${apps.size} 个应用", Modifier.padding(top = 8.dp, bottom = 2.dp).testTag("app_count"),
+                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (state.error != null) item { MessageCard(state.error, true) }
         if (state.loading) item {
@@ -451,8 +439,6 @@ private fun SettingsPage(
         }
         item {
             Column(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("${apps.size} 个应用 · 点击应用可调整显示细则", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = onReset, modifier = Modifier.padding(top = 10.dp).testTag("reset_rules")) {
                     Text("重置所有应用规则")
                 }
@@ -464,7 +450,7 @@ private fun SettingsPage(
 @Composable
 private fun AppListAccessCard(state: UiState, onOpenAppSettings: () -> Unit, onRefresh: () -> Unit) {
     val ready = state.appListAccess == AppListAccess.READY
-    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)) {
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxWidth().padding(16.dp).testTag("app_list_access"),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(when (state.appListAccess) {
@@ -489,7 +475,7 @@ private fun AppListAccessCard(state: UiState, onOpenAppSettings: () -> Unit, onR
 
 @Composable
 private fun ApplicationCard(app: AppRow, onToggle: (Boolean) -> Unit, onDetails: () -> Unit) {
-    Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)) {
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.fillMaxWidth().testTag("app_row_${app.packageName}").clickable(onClick = onDetails)
             .padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -500,15 +486,19 @@ private fun ApplicationCard(app: AppRow, onToggle: (Boolean) -> Unit, onDetails:
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(app.packageName, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (app.enabled) {
-                    Text(when (app.inScope) { true -> "已在作用域 · 效果待验证"; false -> "需要加入框架作用域"; null -> "作用域状态待确认" },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (app.inScope == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                val status = app.syncMessage.ifBlank {
+                    if (!app.enabled) "全屏控制已关闭"
+                    else when (app.inScope) {
+                        true -> "已在作用域 · 效果待验证"
+                        false -> "需要加入框架作用域"
+                        null -> "作用域状态待确认"
+                    }
                 }
+                Text(status, Modifier.testTag("app_sync_${app.packageName}"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (app.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 if (app.allowScreenshot) Text("允许截屏（仅详情页可关闭）", style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.secondary)
-                if (app.syncMessage.isNotBlank()) Text(app.syncMessage, style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Switch(app.enabled, onToggle, modifier = Modifier.testTag("app_toggle_${app.packageName}")
                 .semantics { contentDescription = "${app.label}全屏规则" })
@@ -548,6 +538,12 @@ private fun RulesDialog(
                 RuleRow("延伸至挖孔区域", "允许内容绘制到屏幕缺口附近", app.flags and 8 != 0, app.enabled) {
                     onRuleChange(app.packageName, 8, it)
                 }
+                if (app.packageName == "tv.danmaku.bili") {
+                    RuleRow("哔哩哔哩播放页优化", "修正播放页系统栏留白，保持视频原始比例",
+                        app.flags and RuleCodec.DISABLE_BILIBILI_OPTIMIZATION == 0) {
+                        onRuleChange(app.packageName, RuleCodec.DISABLE_BILIBILI_OPTIMIZATION, !it)
+                    }
+                }
                 RuleRow("允许截屏", "仅当前应用；部分 DRM 或硬件保护内容仍可能无法截屏",
                     app.allowScreenshot, enabled = true) { onScreenshotChange(app.packageName, it) }
                 RuleRow("VPN 检测兼容", "仅当前应用；默认关闭，兼容常见 Android VPN 状态接口；不改变代理路由或 TLS 校验",
@@ -557,12 +553,16 @@ private fun RulesDialog(
                 HorizontalDivider()
                 Text(when (app.inScope) {
                     true -> "已加入框架作用域。规则变化后，请重新启动此应用并检查显示效果。"
-                    false -> "此应用尚未加入框架作用域，开启规则后仍需授权。"
+                    false -> "开启规则后会自动申请作用域授权；未完成时可重试或在框架中勾选。"
                     null -> "暂时无法确认作用域，请检查框架连接与模块启用状态。"
                 }, style = MaterialTheme.typography.bodySmall)
                 if (app.inScope != true) OutlinedButton(onClick = { onScopeRequest(app.packageName) },
-                    modifier = Modifier.fillMaxWidth().testTag("request_scope")) { Text("请求加入作用域") }
-                if (app.syncMessage.isNotBlank()) Text(app.syncMessage, style = MaterialTheme.typography.bodySmall,
+                    enabled = !app.scopeRequestPending,
+                    modifier = Modifier.fillMaxWidth().testTag("request_scope")) {
+                    Text(if (app.scopeRequestPending) "等待框架处理" else "请求加入作用域")
+                }
+                if (app.syncMessage.isNotBlank()) Text(app.syncMessage, Modifier.testTag("rule_sync_status"),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary)
                 Text("全屏不会改变应用自身的画面比例；应用内部留白可能仍然保留。",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -596,32 +596,24 @@ private fun MessageCard(message: String, error: Boolean) {
 }
 
 @Composable
-private fun GlassNavigation(
-    selected: Int, onSelect: (Int) -> Unit, backdrop: Backdrop, dark: Boolean,
+private fun SolidNavigation(
+    selected: Int, onSelect: (Int) -> Unit,
     height: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(40.dp)
-    val tint = if (dark) Color(0xFF292437).copy(alpha = 0.45f) else Color.White.copy(alpha = 0.42f)
-    // Capture only the page behind us. The navigation is a sibling of that capture,
-    // preventing recursive self-sampling and keeping labels crisp above the lens.
-    val glass = if (Build.VERSION.SDK_INT >= 33) {
-        Modifier.drawBackdrop(backdrop = backdrop, shape = { shape },
-            effects = { blur(8.dp.toPx()); lens(20.dp.toPx(), 28.dp.toPx(), depthEffect = true) },
-            highlight = { Highlight(width = 0.8.dp, alpha = if (dark) 0.65f else 0.9f) },
-            onDrawSurface = { drawRect(tint) })
-    } else {
-        Modifier.background(if (dark) Color(0xFF292437).copy(alpha = 0.97f) else Color.White.copy(alpha = 0.96f), shape)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-    }
+    // An opaque navigation surface keeps labels legible over every page.
+    val navigationColor = MaterialTheme.colorScheme.surface
     Row(modifier.widthIn(max = 380.dp).fillMaxWidth().height(height)
-        .then(glass).padding(7.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        .background(navigationColor, shape)
+        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+        .padding(7.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf("主页" to AppIcons.Home, "设置" to AppIcons.Settings).forEachIndexed { index, (label, icon) ->
             val active = selected == index
             val interactionSource = remember { MutableInteractionSource() }
             val pressed by interactionSource.collectIsPressedAsState()
             val focused by interactionSource.collectIsFocusedAsState()
             val background by animateColorAsState(
-                if (active) MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (dark) 0.82f else 0.68f)
+                if (active) MaterialTheme.colorScheme.primaryContainer
                 else Color.Transparent, label = "tabColor")
             val scale by animateFloatAsState(
                 when { pressed -> 0.95f; focused -> 1.015f; active -> 1f; else -> 0.985f },

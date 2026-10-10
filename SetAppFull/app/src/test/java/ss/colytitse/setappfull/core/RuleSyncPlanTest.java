@@ -62,10 +62,10 @@ public class RuleSyncPlanTest {
         assertEquals(Set.of("rule.com.app"), plan.getAcknowledgedDirtyKeys());
     }
 
-    @Test public void malformedRulesAndUnrelatedPreferencesAreNeverPublished() {
+    @Test public void malformedRulesStayOffAndUnrelatedPreferencesAreNeverPublished() {
         var plan = RuleSyncPlan.create(Map.of("rule.com.string", "15", "show_system", true),
                 Map.of("rule.bad/key", 15, "rule.com.boolean", true), false);
-        assertTrue(plan.getLocalValues().isEmpty());
-        assertTrue(plan.getRemoteWrites().isEmpty());
+        assertEquals(Map.of("rule.com.string", 0, "rule.com.boolean", 0), plan.getLocalValues());
+        assertEquals(Map.of("rule.com.string", 0), plan.getRemoteWrites());
     }
 }

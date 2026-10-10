@@ -19,7 +19,7 @@ public class RuleCodecTest {
         assertEquals(32, RuleCodec.normalize(RuleCodec.COMPAT_NETWORK_ENVIRONMENT));
         assertFalse(RuleCodec.isEnabled(RuleCodec.COMPAT_NETWORK_ENVIRONMENT));
         assertEquals(32, RuleCodec.withEnabled(RuleCodec.COMPAT_NETWORK_ENVIRONMENT, false));
-        assertEquals(33, RuleCodec.withEnabled(RuleCodec.COMPAT_NETWORK_ENVIRONMENT, true));
+        assertEquals(47, RuleCodec.withEnabled(RuleCodec.COMPAT_NETWORK_ENVIRONMENT, true));
         assertEquals(15, RuleCodec.withEnabled(0, true));
         assertEquals(1, RuleCodec.withEnabled(RuleCodec.COMPAT_NETWORK_ENVIRONMENT, true)
                 & RuleCodec.ENABLED);
@@ -33,7 +33,7 @@ public class RuleCodecTest {
                 "rule.com.boolean", true,
                 "rule.bad/name", 15,
                 "unrelated", 15));
-        assertEquals(Map.of("com.valid", 63), decoded);
+        assertEquals(Map.of("com.valid", 127), decoded);
     }
 
     @Test public void migratesBothHistoricalAppKeysWithoutEnablingAllScope() {

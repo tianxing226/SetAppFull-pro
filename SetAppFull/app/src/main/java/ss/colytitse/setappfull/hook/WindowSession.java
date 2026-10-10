@@ -259,6 +259,7 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
                 systemUiBaselineCaptured = true;
             }
             int configured = module.ruleFor(packageName);
+            if (BilibiliStoryViewport.PACKAGE.equals(packageName)) module.refreshBilibiliViewport();
             int effective = WindowPolicy.effectiveRule(configured,
                     activity != null && activity.isInMultiWindowMode(),
                     activity != null && activity.isInPictureInPictureMode(), floating,
@@ -434,10 +435,11 @@ final class WindowSession implements ViewTreeObserver.OnGlobalLayoutListener,
         int configured = module.ruleFor(packageName);
         boolean enabled = RuleCodec.isEnabled(configured)
                 && (effective & (RuleCodec.HIDE_STATUS | RuleCodec.HIDE_NAVIGATION | RuleCodec.ALLOW_CUTOUT)) != 0;
+        boolean bilibiliOptimization = (configured & RuleCodec.DISABLE_BILIBILI_OPTIMIZATION) == 0;
         WindowInsets rootInsets = window.getDecorView().getRootWindowInsets();
         boolean hasTopInset = bilibiliPlayer
                 && (scopedEdgeToEdge || contentStartsBelowStatusInset(window, rootInsets));
-        boolean matched = (fusionWebApp || (bilibiliPlayer && hasTopInset)) && enabled;
+        boolean matched = (fusionWebApp || (bilibiliPlayer && bilibiliOptimization && hasTopInset)) && enabled;
         View decor = window.getDecorView();
         if (matched && !scopedEdgeToEdge) {
             scopedOriginalStatusBarColor = window.getStatusBarColor();

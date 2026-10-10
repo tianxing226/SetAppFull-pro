@@ -22,6 +22,7 @@ import ss.colytitse.setappfull.ui.FrameworkStatus
 import ss.colytitse.setappfull.ui.UiState
 import ss.colytitse.setappfull.core.RuleCodec
 import ss.colytitse.setappfull.core.RuleSyncPlan
+import ss.colytitse.setappfull.core.ScopeRequestPolicy
 
 /** Application-scoped bridge. Binder and disk operations never run on the UI thread. */
 class AppRepository(private val app: Application) {
@@ -36,6 +37,8 @@ class AppRepository(private val app: Application) {
     private var appListNeedsRefresh = true
     private var migrated = false
     private val excluded = setOf(app.packageName, "android", "com.android.systemui")
+    private var confirmedScope: Set<String>? = null
+    private val requestTokens = mutableMapOf<String, Any>()
 
     init {
         worker.launch {
@@ -62,6 +65,7 @@ class AppRepository(private val app: Application) {
                 if (service === dead) {
                     service = null
                     remote = null
+                    confirmedScope = null
                     mutableState.value = mutableState.value.copy(
                         frameworkName = "", frameworkVersion = "", frameworkApi = null,
                         status = FrameworkStatus.DISCONNECTED,
@@ -111,9 +115,11 @@ class AppRepository(private val app: Application) {
 
     private fun refreshLocked() {
         migrateLegacy()
+        restorePendingScopeTimeouts()
         if (appListNeedsRefresh) refreshAppListLocked()
         val current = service
         if (current == null) {
+            confirmedScope = null
             rebuildRows(null)
             return
         }
@@ -130,13 +136,21 @@ class AppRepository(private val app: Application) {
                     else "当前框架不支持 API 101 或远程配置，暂不能同步规则。",
                 error = null,
             )
+            // Query scope before acknowledging a reset: implicit scoped defaults also need off
+            // records, even if this installation never downloaded an explicit rule for them.
+            val scope = current.scope.filter { it !in excluded && PACKAGE.matches(it) }.toSet()
+            confirmedScope = scope
+            check(local.edit().putStringSet(LAST_SCOPE, scope).commit())
+            reconcileScopeRequests(scope)
             if (supported) {
                 if (remote == null) remote = current.getRemotePreferences("rules")
-                synchronizeRules()
+                synchronizeRules(scope)
             } else remote = null
-            rebuildRows(current.scope.toSet())
+            if (supported) dispatchQueuedScopeRequests(current, scope)
+            rebuildRows(scope)
         } catch (failure: Exception) {
             remote = null
+            confirmedScope = null
             mutableState.value = mutableState.value.copy(
                 frameworkName = "", frameworkVersion = "", frameworkApi = null,
                 status = FrameworkStatus.DISCONNECTED,
@@ -149,10 +163,9 @@ class AppRepository(private val app: Application) {
     }
 
     /** Dirty keys win over remote data, including offline disable/reset operations. */
-    private fun synchronizeRules() {
+    private fun synchronizeRules(scope: Set<String>) {
         val prefs = remote ?: return
-        migrateLegacySystemModeRules(prefs)
-        val plan = RuleSyncPlan.create(local.all, prefs.all, local.getBoolean("reset_pending", false))
+        val plan = RuleSyncPlan.create(local.all, prefs.all, local.getBoolean("reset_pending", false), scope)
         val edit = prefs.edit()
         plan.remoteWrites.forEach { (key, value) -> edit.putInt(key, value) }
         check(edit.commit()) { "Remote commit failed" }
@@ -164,23 +177,44 @@ class AppRepository(private val app: Application) {
     }
 
     fun toggle(packageName: String, enabled: Boolean) = enqueue {
-        val previous = local.getInt(PREFIX + packageName, 0)
-        writeRule(packageName, RuleCodec.withEnabled(previous, enabled))
+        val previous = currentFlags(packageName)
+        writeRule(packageName, RuleCodec.withEnabled(previous, enabled), requestScope = enabled)
     }
 
     fun setOption(packageName: String, option: Int, enabled: Boolean) = enqueue {
         require(option == RuleCodec.HIDE_STATUS || option == RuleCodec.HIDE_NAVIGATION ||
             option == RuleCodec.ALLOW_CUTOUT || option == RuleCodec.ALLOW_SCREENSHOT ||
-            option == RuleCodec.COMPAT_NETWORK_ENVIRONMENT)
+            option == RuleCodec.COMPAT_NETWORK_ENVIRONMENT ||
+            option == RuleCodec.DISABLE_BILIBILI_OPTIMIZATION)
         // Read inside the queue: different switches may be tapped before UI state catches up.
-        val previous = local.getInt(PREFIX + packageName, 0)
-        writeRule(packageName, if (enabled) previous or option else previous and option.inv())
+        val previous = currentFlags(packageName)
+        writeRule(packageName, if (enabled) previous or option else previous and option.inv(),
+            requestScope = enabled && (option == RuleCodec.ALLOW_SCREENSHOT ||
+                option == RuleCodec.COMPAT_NETWORK_ENVIRONMENT))
     }
 
-    private fun writeRule(packageName: String, flags: Int) {
+    private fun currentFlags(packageName: String): Int = RuleCodec.resolveDisplayRule(
+        RuleCodec.decodeForScope(remote?.all.orEmpty() + local.all), packageName,
+        confirmedScope?.contains(packageName),
+        local.getStringSet(LAST_SCOPE, emptySet()).orEmpty().contains(packageName),
+        local.getBoolean("reset_pending", false),
+    )
+
+    private fun writeRule(packageName: String, flags: Int, requestScope: Boolean = false) {
         require(packageName !in excluded && PACKAGE.matches(packageName))
         val key = PREFIX + packageName
-        check(local.edit().putInt(key, flags and RuleCodec.ALL_FLAGS).putBoolean("dirty.$key", true).commit())
+        val edit = local.edit().putInt(key, flags and RuleCodec.ALL_FLAGS).putBoolean("dirty.$key", true)
+        if (requestScope) queueScopeRequest(edit, packageName)
+        else if (flags and (RuleCodec.ENABLED or RuleCodec.ALLOW_SCREENSHOT or
+                RuleCodec.COMPAT_NETWORK_ENVIRONMENT) == 0) {
+            // A framework prompt cannot be cancelled through the public service API. Retain its
+            // marker to deduplicate rapid off/on actions; its callback never changes this rule.
+            if (local.getString(REQUEST_PREFIX + packageName, null) != ScopeRequestPolicy.REQUESTED) {
+                edit.remove(REQUEST_PREFIX + packageName).remove(REQUEST_TIME_PREFIX + packageName)
+                requestTokens.remove(packageName)
+            }
+        }
+        check(edit.commit())
         refreshLocked()
     }
 
@@ -191,31 +225,118 @@ class AppRepository(private val app: Application) {
 
     fun reset() = enqueue {
         val keys = local.all.keys.filter { it.startsWith(PREFIX) }.toSet() +
-            (remote?.all?.keys?.filter { it.startsWith(PREFIX) } ?: emptyList())
+            (remote?.all?.keys?.filter { it.startsWith(PREFIX) } ?: emptyList()) +
+            (confirmedScope ?: local.getStringSet(LAST_SCOPE, emptySet()).orEmpty())
+                .filter { it !in excluded && PACKAGE.matches(it) }.map { PREFIX + it } +
+            ScopeRequestPolicy.pendingPackages(local.all, REQUEST_PREFIX)
+                .filter { it !in excluded && PACKAGE.matches(it) }.map { PREFIX + it }
         val edit = local.edit()
         keys.forEach { edit.putInt(it, 0).putBoolean("dirty.$it", true) }
+        local.all.forEach { (key, value) ->
+            if (key.startsWith(REQUEST_PREFIX) && value is String && value != ScopeRequestPolicy.REQUESTED) {
+                val packageName = key.removePrefix(REQUEST_PREFIX)
+                edit.remove(key).remove(REQUEST_TIME_PREFIX + packageName)
+                requestTokens.remove(packageName)
+            }
+        }
         check(edit.putBoolean("reset_pending", true).commit())
         refreshLocked()
     }
 
     fun requestScope(packageName: String) = enqueue {
         require(packageName !in excluded && PACKAGE.matches(packageName))
-        val current = service
-        if (current == null) {
-            mutableState.value = mutableState.value.copy(error = "请先在 LSPosed 中启用本模块，再申请应用作用域。")
-            return@enqueue
+        check(local.edit().also { queueScopeRequest(it, packageName) }.commit())
+        refreshLocked()
+    }
+
+    private fun queueScopeRequest(edit: SharedPreferences.Editor, packageName: String) {
+        if (confirmedScope?.contains(packageName) == true) return
+        val key = REQUEST_PREFIX + packageName
+        val reconciled = ScopeRequestPolicy.reconcile(local.getString(key, null), false,
+            local.getLong(REQUEST_TIME_PREFIX + packageName, 0L), System.currentTimeMillis())
+        edit.putString(key, ScopeRequestPolicy.queue(reconciled))
+    }
+
+    private fun reconcileScopeRequests(scope: Set<String>) {
+        val edit = local.edit()
+        var changed = false
+        local.all.forEach { (key, value) ->
+            if (!key.startsWith(REQUEST_PREFIX) || value !is String) return@forEach
+            val packageName = key.removePrefix(REQUEST_PREFIX)
+            val next = ScopeRequestPolicy.reconcile(value, packageName in scope,
+                local.getLong(REQUEST_TIME_PREFIX + packageName, 0L), System.currentTimeMillis())
+            if (next != value) {
+                changed = true
+                if (next == null) edit.remove(key).remove(REQUEST_TIME_PREFIX + packageName)
+                else edit.putString(key, next)
+                requestTokens.remove(packageName)
+            }
         }
-        current.requestScope(listOf(packageName), object : XposedService.OnScopeEventListener {
-            override fun onScopeRequestApproved(approved: MutableList<String>) {
-                refresh()
+        if (changed) check(edit.commit())
+    }
+
+    private fun dispatchQueuedScopeRequests(current: XposedService, scope: Set<String>) {
+        local.all.forEach { (key, value) ->
+            if (!key.startsWith(REQUEST_PREFIX) || value !is String) return@forEach
+            val packageName = key.removePrefix(REQUEST_PREFIX)
+            if (packageName in excluded || !PACKAGE.matches(packageName) ||
+                !ScopeRequestPolicy.shouldDispatch(value, true, packageName in scope)) return@forEach
+            val token = Any()
+            requestTokens[packageName] = token
+            // Persist before IPC, since a process restart must not issue the same dialog again.
+            check(local.edit().putString(key, ScopeRequestPolicy.REQUESTED)
+                .putLong(REQUEST_TIME_PREFIX + packageName, System.currentTimeMillis()).commit())
+            try {
+                current.requestScope(listOf(packageName), object : XposedService.OnScopeEventListener {
+                    override fun onScopeRequestApproved(approved: MutableList<String>) = enqueue {
+                        finishScopeRequest(packageName, token)
+                    }
+                    override fun onScopeRequestFailed(message: String) = enqueue {
+                        finishScopeRequest(packageName, token)
+                    }
+                })
+            } catch (failure: RuntimeException) {
+                requestTokens.remove(packageName)
+                check(local.edit().putString(key, ScopeRequestPolicy.NEEDS_RETRY).commit())
+                Log.w("SetAppFull", "Scope request failed: ${failure.javaClass.simpleName}")
             }
-            override fun onScopeRequestFailed(message: String) = enqueue {
-                refreshLocked()
-                mutableState.value = mutableState.value.copy(
-                    error = "作用域申请未完成，请到框架管理器中勾选该应用。",
-                )
+            scheduleScopeTimeout(packageName, token)
+        }
+    }
+
+    /** A process restart loses callbacks and timers but keeps the outstanding request marker.
+     * Restore its remaining timeout even while disconnected; never dispatch another request. */
+    private fun restorePendingScopeTimeouts() {
+        local.all.forEach { (key, value) ->
+            if (!key.startsWith(REQUEST_PREFIX) || value != ScopeRequestPolicy.REQUESTED) return@forEach
+            val packageName = key.removePrefix(REQUEST_PREFIX)
+            if (packageName in excluded || !PACKAGE.matches(packageName) ||
+                requestTokens.containsKey(packageName)) return@forEach
+            val token = Any()
+            requestTokens[packageName] = token
+            scheduleScopeTimeout(packageName, token)
+        }
+    }
+
+    private fun scheduleScopeTimeout(packageName: String, token: Any) {
+        val remaining = ScopeRequestPolicy.remainingDelayMillis(
+            local.getLong(REQUEST_TIME_PREFIX + packageName, 0L), System.currentTimeMillis())
+        worker.launch {
+            delay(remaining)
+            enqueue {
+                if (requestTokens[packageName] === token) finishScopeRequest(packageName, token)
             }
-        })
+        }
+    }
+
+    private fun finishScopeRequest(packageName: String, token: Any) {
+        // A newer request invalidates an old callback. Never change rules here: a reset/disable
+        // while the framework prompt is open must remain off even if the user later approves.
+        if (requestTokens[packageName] !== token) return
+        requestTokens.remove(packageName)
+        check(local.edit().putString(REQUEST_PREFIX + packageName, ScopeRequestPolicy.NEEDS_RETRY).commit())
+        // The callback list is not authoritative: re-read the actual scope before claiming success.
+        refreshLocked()
     }
 
     @Suppress("DEPRECATION")
@@ -254,15 +375,36 @@ class AppRepository(private val app: Application) {
 
     private fun rebuildRows(scope: Set<String>?) {
         val show = local.getBoolean("show_system", false)
+        val snapshot = remote?.all.orEmpty() + local.all
+        val rules = RuleCodec.decodeForScope(snapshot)
+        val lastScope = local.getStringSet(LAST_SCOPE, emptySet()).orEmpty()
+        val pendingReset = local.getBoolean("reset_pending", false)
         val all = appCache.orEmpty().map { row ->
             val key = PREFIX + row.packageName
-            val flags = local.getInt(key, 0)
+            val explicit = snapshot.containsKey(key)
+            val flags = RuleCodec.resolveDisplayRule(rules, row.packageName,
+                scope?.contains(row.packageName), row.packageName in lastScope, pendingReset)
             val dirty = local.getBoolean("dirty.$key", false)
+            val pending = local.getString(REQUEST_PREFIX + row.packageName, null)
             row.copy(
                 flags = flags,
                 inScope = scope?.contains(row.packageName),
+                scopeRequestPending = pending == ScopeRequestPolicy.QUEUED ||
+                    pending == ScopeRequestPolicy.REQUESTED,
+                usesScopeDefault = !explicit && scope?.contains(row.packageName) == true,
                 syncMessage = when {
                     dirty -> "已保存到本机，待连接框架同步"
+                    explicit && flags and (RuleCodec.ENABLED or RuleCodec.ALLOW_SCREENSHOT or
+                        RuleCodec.COMPAT_NETWORK_ENVIRONMENT) == 0 -> "全屏控制已关闭"
+                    pending == ScopeRequestPolicy.REQUESTED -> "等待授权：请确认框架通知中的作用域申请"
+                    pending == ScopeRequestPolicy.QUEUED -> "已保存，等待框架连接后申请作用域"
+                    pending == ScopeRequestPolicy.NEEDS_RETRY -> "授权未确认；可重试或在框架作用域中勾选"
+                    !explicit && scope == null && !pendingReset ->
+                        if (row.packageName in lastScope) "上次使用作用域默认规则；当前连接与效果待确认"
+                        else "未配置规则；等待框架连接确认作用域"
+                    flags and (RuleCodec.ENABLED or RuleCodec.ALLOW_SCREENSHOT or
+                        RuleCodec.COMPAT_NETWORK_ENVIRONMENT) == 0 -> "全屏控制已关闭"
+                    !explicit && scope?.contains(row.packageName) == true -> "默认沉浸式已准备；重启目标应用后检查效果"
                     flags and 1 == 0 -> "未启用全屏控制"
                     remote == null -> "规则尚未同步，等待框架连接"
                     scope == null -> "作用域与加载状态待验证"
@@ -300,54 +442,14 @@ class AppRepository(private val app: Application) {
             }
             check(edit.putBoolean("migration_complete", true).commit())
         }
-        migrateLegacySystemModeRules(null)
         migrated = true
-    }
-
-    /**
-     * The old SystemMode meant the complete immersive mode, but its first new-format migration
-     * wrote only ENABLED+CUTOUT (9). That made the app edge-to-edge while leaving status icons
-     * visible on devices whose system bar behavior differs from the emulator. Upgrade only those
-     * packages that can be traced to the historical SystemMode list, once per package.
-     */
-    private fun migrateLegacySystemModeRules(remotePrefs: SharedPreferences?) {
-        val names = (app.getSharedPreferences("config", Context.MODE_PRIVATE)
-            .getString("SystemMode", "") ?: "")
-            .split('#')
-            .map(String::trim)
-            .filter { RuleCodec.validPackage(it) && it !in excluded }
-            .toSet()
-        if (names.isEmpty()) return
-
-        val localEdit = local.edit()
-        val remoteEdit = remotePrefs?.edit()
-        var localChanged = false
-        var remoteChanged = false
-        names.forEach { packageName ->
-            val marker = LEGACY_SYSTEM_MODE_MARKER + packageName
-            if (local.getBoolean(marker, false)) return@forEach
-            val key = PREFIX + packageName
-            val localValue = local.getInt(key, Int.MIN_VALUE)
-            val remoteValue = remotePrefs?.getInt(key, Int.MIN_VALUE) ?: Int.MIN_VALUE
-            val legacyValue = RuleCodec.ENABLED or RuleCodec.ALLOW_CUTOUT
-            if (localValue == legacyValue || remoteValue == legacyValue) {
-                localEdit.putInt(key, RuleCodec.DEFAULT_ENABLED)
-                    .putBoolean("dirty.$key", true)
-                localChanged = true
-                if (remoteEdit != null && remoteValue == legacyValue) {
-                    remoteEdit.putInt(key, RuleCodec.DEFAULT_ENABLED)
-                    remoteChanged = true
-                }
-                localEdit.putBoolean(marker, true)
-            }
-        }
-        if (remoteChanged) check(remoteEdit!!.commit()) { "Legacy remote migration failed" }
-        if (localChanged) check(localEdit.commit()) { "Legacy local migration failed" }
     }
 
     companion object {
         private const val PREFIX = "rule."
-        private const val LEGACY_SYSTEM_MODE_MARKER = "legacy.systemMode.fullscreen."
+        private const val REQUEST_PREFIX = "scope.request."
+        private const val REQUEST_TIME_PREFIX = "scope.request.time."
+        private const val LAST_SCOPE = "scope.last"
         private val PACKAGE = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+")
     }
 }

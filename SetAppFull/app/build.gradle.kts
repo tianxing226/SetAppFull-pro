@@ -50,8 +50,8 @@ android {
         applicationId = "io.github.tianxing226.setappfullpro"
         minSdk = 30
         targetSdk = 37
-        versionCode = 205
-        versionName = "2.0.5"
+        versionCode = 206
+        versionName = "2.0.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -112,7 +112,6 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.coroutines.android)
-    implementation(libs.backdrop)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.compose.bom))

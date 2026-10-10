@@ -32,6 +32,8 @@ data class AppRow(
     val inScope: Boolean? = null,
     val isSystem: Boolean = false,
     val syncMessage: String = "",
+    val scopeRequestPending: Boolean = false,
+    val usesScopeDefault: Boolean = false,
 ) {
     val enabled: Boolean get() = flags and RuleCodec.ENABLED != 0
     val allowScreenshot: Boolean get() = flags and RuleCodec.ALLOW_SCREENSHOT != 0
