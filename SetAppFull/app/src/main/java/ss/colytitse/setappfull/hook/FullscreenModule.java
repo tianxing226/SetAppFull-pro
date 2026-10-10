@@ -85,8 +85,10 @@ public final class FullscreenModule extends XposedModule {
                 || "android".equals(param.getPackageName())
                 || "com.android.systemui".equals(param.getPackageName())
                 || MODULE_PACKAGE.equals(param.getPackageName())) return;
-        targetPackageName = param.getPackageName();
         if (hooksInstalled) return;
+        // Auxiliary packages (for example WebView) may become ready in the same process later.
+        // Keep the originally injected identity or an implicit scoped rule would flip off.
+        targetPackageName = param.getPackageName();
         hooksInstalled = true;
         if (BilibiliStoryViewport.PACKAGE.equals(targetPackageName)) {
             try { bilibiliViewport = new BilibiliStoryViewport(this, param.getClassLoader()); }
